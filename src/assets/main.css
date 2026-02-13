@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pink-primary: #ec4899;
+  --color-pink-dark: #be185d;
+  --color-slate-bg: #0f172a;
+  --color-slate-card: #1e293b;
+  --color-slate-border: #334155;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 2px;
+}
+
+/* Message bubble animations */
+.msg-enter-active {
+  transition: all 0.3s ease;
+}
+.msg-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+/* Graph node styles */
+.graph-node {
+  cursor: pointer;
+  transition: r 0.2s;
+}
+.graph-node:hover {
+  filter: brightness(1.3);
+}
