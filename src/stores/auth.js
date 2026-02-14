@@ -41,9 +41,16 @@ export const useAuthStore = defineStore('auth', () => {
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState === 'visible' && user.value) {
         try {
-          const { data: { session } } = await supabase.auth.getSession()
+          // Try getSession first (uses cached/stored session)
+          let { data: { session } } = await supabase.auth.getSession()
           if (session?.user) {
             user.value = session.user
+          } else {
+            // If no session found, try refreshing the token
+            const { data } = await supabase.auth.refreshSession()
+            if (data.session?.user) {
+              user.value = data.session.user
+            }
           }
         } catch (e) {
           console.error('Session refresh error:', e)

@@ -8,6 +8,7 @@ export const useGraphStore = defineStore('graph', () => {
   const edges = ref([])
   const loading = ref(false)
   const searchQuery = ref('')
+  let realtimeChannel = null
 
   async function fetchGraph() {
     const couple = useCoupleStore()
@@ -32,6 +33,59 @@ export const useGraphStore = defineStore('graph', () => {
     loading.value = false
   }
 
+  // Subscribe to real-time graph changes so new nodes/edges appear live
+  function subscribeToGraphChanges() {
+    unsubscribeFromGraphChanges()
+    const couple = useCoupleStore()
+    if (!couple.coupleId) return
+
+    realtimeChannel = supabase
+      .channel(`graph:${couple.coupleId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'graph_nodes',
+        filter: `couple_id=eq.${couple.coupleId}`
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          // Add new node if not already present
+          if (!nodes.value.some(n => n.id === payload.new.id)) {
+            nodes.value.push(payload.new)
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const idx = nodes.value.findIndex(n => n.id === payload.new.id)
+          if (idx !== -1) nodes.value[idx] = payload.new
+        } else if (payload.eventType === 'DELETE') {
+          nodes.value = nodes.value.filter(n => n.id !== payload.old.id)
+        }
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'graph_edges',
+        filter: `couple_id=eq.${couple.coupleId}`
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          if (!edges.value.some(e => e.id === payload.new.id)) {
+            edges.value.push(payload.new)
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const idx = edges.value.findIndex(e => e.id === payload.new.id)
+          if (idx !== -1) edges.value[idx] = payload.new
+        } else if (payload.eventType === 'DELETE') {
+          edges.value = edges.value.filter(e => e.id !== payload.old.id)
+        }
+      })
+      .subscribe()
+  }
+
+  function unsubscribeFromGraphChanges() {
+    if (realtimeChannel) {
+      supabase.removeChannel(realtimeChannel)
+      realtimeChannel = null
+    }
+  }
+
   function searchNodes(query) {
     searchQuery.value = query
     if (!query) return nodes.value
@@ -50,6 +104,7 @@ export const useGraphStore = defineStore('graph', () => {
 
   return {
     nodes, edges, loading, searchQuery,
-    fetchGraph, searchNodes, getRelatedEdges
+    fetchGraph, searchNodes, getRelatedEdges,
+    subscribeToGraphChanges, unsubscribeFromGraphChanges
   }
 })

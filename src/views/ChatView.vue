@@ -77,10 +77,19 @@ watch(() => couple.isConnected, async (connected, wasConnected) => {
 const visibilityHandler = async () => {
   if (document.visibilityState === 'visible' && couple.isConnected && chat.todayThread) {
     try {
-      await chat.loadMessages(chat.todayThread.id)
+      // Full reconnect: refreshes auth, re-subscribes realtime, reloads messages
+      await chat.reconnect()
+      await nextTick()
       scrollToBottom()
     } catch (e) {
-      console.error('Message reload error:', e)
+      console.error('Reconnect error:', e)
+      // Last resort: try a simple message reload
+      try {
+        await chat.loadMessages(chat.todayThread.id)
+        scrollToBottom()
+      } catch {
+        // Silently fail - user can refresh manually
+      }
     }
   }
 }
@@ -291,10 +300,19 @@ async function refreshLobby() {
           <span class="text-pink-400 text-lg">&#x2764;</span>
           <div>
             <h1 class="text-lg font-bold text-rose-900">{{ couple.partner?.nickname || '상대방' }}과의 대화</h1>
-            <p class="text-xs text-pink-400/70">{{ chat.todayThread?.date || '오늘' }}</p>
+            <p class="text-xs text-pink-400/70">
+              {{ chat.todayThread?.date || '오늘' }}
+              <span v-if="chat.extractingGraph" class="text-purple-400 ml-1 animate-pulse">&#x2728; 그래프 추출중...</span>
+            </p>
           </div>
         </div>
         <div class="flex gap-2">
+          <button @click="chat.triggerGraphExtraction()"
+            :disabled="chat.extractingGraph || chat.messages.length < 3"
+            class="text-xs bg-emerald-100 text-emerald-500 px-3 py-1.5 rounded-lg hover:bg-emerald-200 transition-colors font-medium disabled:opacity-40"
+            title="대화에서 그래프 추출">
+            그래프
+          </button>
           <button @click="showAnalysis = !showAnalysis"
             class="text-xs bg-purple-100 text-purple-500 px-3 py-1.5 rounded-lg hover:bg-purple-200 transition-colors font-medium">
             분석
