@@ -44,6 +44,7 @@ jobs:
             parse-kakao-txt
             analyze-call-audio
             admin-metrics
+            accept-guest-connection
           )
           for fn in "${FUNCTIONS[@]}"; do
             echo "Deploying $fn..."
