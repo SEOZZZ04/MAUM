@@ -75,7 +75,7 @@ serve(async (req) => {
       .from('uploads')
       .select('*')
       .eq('id', upload_id)
-      .single()
+      .maybeSingle()
     if (!upload) throw new Error('Upload not found')
 
     // Get couple
@@ -83,7 +83,7 @@ serve(async (req) => {
       .from('couple_members')
       .select('couple_id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
     if (!membership) throw new Error('커플이 연동되지 않았습니다')
 
     const coupleId = membership.couple_id
@@ -122,7 +122,7 @@ serve(async (req) => {
         .eq('couple_id', coupleId)
         .eq('date', date)
         .eq('archived', false)
-        .single()
+        .maybeSingle()
 
       let dayId: string
       if (existingDay) {
