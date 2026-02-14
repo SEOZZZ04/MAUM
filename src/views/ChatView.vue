@@ -28,17 +28,11 @@ const requestSent = ref({})
 const isMe = (msg) => msg.sender_user_id === auth.userId
 
 // Initialize chat when couple is connected
-async function initChat() {
-  try {
-    const day = await chat.ensureTodayThread()
-    if (day) {
-      await chat.loadMessages(day.id)
-      chat.subscribeToMessages(day.id)
-      await nextTick()
-      scrollToBottom()
-    }
-  } catch (e) {
-    console.error('Chat init error:', e)
+async function doInitChat() {
+  const day = await chat.initChat()
+  if (day) {
+    await nextTick()
+    scrollToBottom()
   }
 }
 
@@ -49,7 +43,7 @@ onMounted(async () => {
     }
     return
   }
-  await initChat()
+  await doInitChat()
 })
 
 onUnmounted(() => {
@@ -64,7 +58,7 @@ onUnmounted(() => {
 watch(() => couple.isConnected, async (connected, wasConnected) => {
   if (connected && !wasConnected) {
     // Just got connected - initialize chat
-    await initChat()
+    await doInitChat()
   } else if (!connected && wasConnected) {
     // Just got disconnected - clean up chat
     chat.unsubscribe()
@@ -72,25 +66,31 @@ watch(() => couple.isConnected, async (connected, wasConnected) => {
   }
 })
 
-// Handle visibility change with proper event listener (not Vue watch!)
-// document.visibilityState is NOT reactive - Vue watch won't detect changes
-const visibilityHandler = async () => {
-  if (document.visibilityState === 'visible' && couple.isConnected && chat.todayThread) {
-    try {
-      // Full reconnect: refreshes auth, re-subscribes realtime, reloads messages
-      await chat.reconnect()
-      await nextTick()
-      scrollToBottom()
-    } catch (e) {
-      console.error('Reconnect error:', e)
-      // Last resort: try a simple message reload
+// Handle visibility change with debounce to prevent multiple rapid reconnections
+let _reconnectTimer = null
+const visibilityHandler = () => {
+  if (document.visibilityState === 'visible' && couple.isConnected) {
+    // Debounce: wait 300ms to avoid firing multiple times
+    if (_reconnectTimer) clearTimeout(_reconnectTimer)
+    _reconnectTimer = setTimeout(async () => {
+      _reconnectTimer = null
       try {
-        await chat.loadMessages(chat.todayThread.id)
+        await chat.reconnect()
+        await nextTick()
         scrollToBottom()
-      } catch {
-        // Silently fail - user can refresh manually
+      } catch (e) {
+        console.error('Reconnect error:', e)
+        // Last resort: try a simple message reload
+        try {
+          if (chat.todayThread) {
+            await chat.loadMessages(chat.todayThread.id)
+            scrollToBottom()
+          }
+        } catch {
+          // Silently fail - user can refresh manually
+        }
       }
-    }
+    }, 300)
   }
 }
 document.addEventListener('visibilitychange', visibilityHandler)
@@ -121,11 +121,7 @@ async function send() {
 async function archiveAndReset() {
   if (!confirm('오늘 대화를 아카이브하고 새로 시작할까요?')) return
   await chat.archiveToday()
-  const day = await chat.ensureTodayThread()
-  if (day) {
-    await chat.loadMessages(day.id)
-    chat.subscribeToMessages(day.id)
-  }
+  await doInitChat()
 }
 
 async function askAnalysis() {
@@ -194,7 +190,7 @@ async function refreshLobby() {
             <span class="text-3xl text-pink-400 float-heart">&#x2764;</span>
             <span class="text-2xl text-sky-400 float-heart-delay">&#x2764;</span>
           </div>
-          <h2 class="text-xl font-bold text-rose-900 mb-1">게스트 로비</h2>
+          <h2 class="text-xl font-bold text-rose-800 mb-1">게스트 로비</h2>
           <p class="text-pink-400/70 text-sm">접속 중인 다른 게스트와 연결해보세요!</p>
         </div>
 
@@ -207,7 +203,7 @@ async function refreshLobby() {
               <div class="w-8 h-8 rounded-full bg-pink-200/50 flex items-center justify-center text-pink-600 text-sm font-bold">
                 {{ req.from_profile?.nickname?.[0] || '?' }}
               </div>
-              <span class="text-rose-900 font-medium text-sm">{{ req.from_profile?.nickname || 'Guest' }}</span>
+              <span class="text-rose-800 font-medium text-sm">{{ req.from_profile?.nickname || 'Guest' }}</span>
             </div>
             <div class="flex gap-1.5">
               <button @click="acceptReq(req.id)"
@@ -250,7 +246,7 @@ async function refreshLobby() {
                 <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white pulse-online"></div>
               </div>
               <div class="text-left">
-                <span class="text-rose-900 font-medium text-sm">{{ guest.nickname }}</span>
+                <span class="text-rose-800 font-medium text-sm">{{ guest.nickname }}</span>
                 <p class="text-pink-400/60 text-[10px]">접속중</p>
               </div>
             </div>
@@ -282,7 +278,7 @@ async function refreshLobby() {
             <span class="text-4xl text-pink-400 float-heart">&#x2764;</span>
             <span class="text-3xl text-sky-400 float-heart-delay">&#x2764;</span>
           </div>
-          <h2 class="text-xl font-bold text-rose-900 mb-2">커플 연동이 필요해요</h2>
+          <h2 class="text-xl font-bold text-rose-800 mb-2">커플 연동이 필요해요</h2>
           <p class="text-pink-400/70 mb-6">설정에서 초대코드를 생성하거나 입력해주세요</p>
           <router-link to="/settings"
             class="bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-500 hover:to-rose-500 text-white px-6 py-3 rounded-2xl font-semibold transition-all hover:-translate-y-0.5 shadow-md shadow-pink-200">
@@ -299,7 +295,7 @@ async function refreshLobby() {
         <div class="flex items-center gap-2">
           <span class="text-pink-400 text-lg">&#x2764;</span>
           <div>
-            <h1 class="text-lg font-bold text-rose-900">{{ couple.partner?.nickname || '상대방' }}과의 대화</h1>
+            <h1 class="text-lg font-bold text-rose-800">{{ couple.partner?.nickname || '상대방' }}과의 대화</h1>
             <p class="text-xs text-pink-400/70">
               {{ chat.todayThread?.date || '오늘' }}
               <span v-if="chat.extractingGraph" class="text-purple-400 ml-1 animate-pulse">&#x2728; 그래프 추출중...</span>
@@ -333,7 +329,7 @@ async function refreshLobby() {
         <div class="flex gap-2 mb-3">
           <input v-model="analysisQuestion" @keydown.enter="askAnalysis"
             placeholder="예: 최근 갈등 패턴이 뭐야?"
-            class="flex-1 bg-white text-rose-900 text-sm rounded-lg px-3 py-2 border border-purple-200 focus:border-purple-400 focus:outline-none" />
+            class="flex-1 bg-white text-rose-800 text-sm rounded-lg px-3 py-2 border border-purple-200 focus:border-purple-400 focus:outline-none" />
           <button @click="askAnalysis" :disabled="analysisLoading"
             class="bg-purple-400 hover:bg-purple-500 text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50 font-medium">
             질문
@@ -355,7 +351,7 @@ async function refreshLobby() {
             <div class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed"
               :class="isMe(msg)
                 ? 'bg-gradient-to-br from-pink-400 to-rose-400 text-white rounded-br-md shadow-sm shadow-pink-200'
-                : 'bg-white text-rose-900 rounded-bl-md border border-sky-100 shadow-sm shadow-sky-100/50'">
+                : 'bg-white text-rose-800 rounded-bl-md border border-sky-100 shadow-sm shadow-sky-100/50'">
               {{ msg.text }}
             </div>
             <p class="text-[10px] mt-1 text-pink-300/60" :class="isMe(msg) ? 'text-right' : ''">
@@ -373,7 +369,7 @@ async function refreshLobby() {
             @keydown="handleKeydown"
             placeholder="메시지를 입력하세요..."
             rows="1"
-            class="flex-1 bg-pink-50/50 text-rose-900 rounded-xl px-4 py-3 text-sm border border-pink-200 focus:border-pink-400 focus:outline-none resize-none placeholder-pink-300"
+            class="flex-1 bg-pink-50/50 text-rose-800 rounded-xl px-4 py-3 text-sm border border-pink-200 focus:border-pink-400 focus:outline-none resize-none placeholder-pink-300"
           />
           <button
             @click="send"

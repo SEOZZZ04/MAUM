@@ -33,7 +33,7 @@ function formatDate(d) {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
       </button>
-      <h1 class="text-lg font-bold text-rose-900">통화 상세</h1>
+      <h1 class="text-lg font-bold text-rose-800">통화 상세</h1>
     </div>
 
     <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
@@ -41,12 +41,12 @@ function formatDate(d) {
       <template v-else-if="call">
         <CardWrapper>
           <p class="text-xs text-sky-400 mb-2">{{ formatDate(call.occurred_at) }}</p>
-          <h2 class="text-lg font-bold text-rose-900 mb-3">요약</h2>
+          <h2 class="text-lg font-bold text-rose-800 mb-3">요약</h2>
           <p class="text-sm text-rose-800/80 whitespace-pre-wrap">{{ call.summary || '요약 없음' }}</p>
         </CardWrapper>
 
         <CardWrapper v-if="call.timeline">
-          <h2 class="text-lg font-bold text-rose-900 mb-3">대화 흐름</h2>
+          <h2 class="text-lg font-bold text-rose-800 mb-3">대화 흐름</h2>
           <div class="space-y-2">
             <div v-for="(item, i) in call.timeline" :key="i"
               class="flex gap-3 text-sm">
@@ -57,18 +57,18 @@ function formatDate(d) {
         </CardWrapper>
 
         <CardWrapper v-if="call.emotions">
-          <h2 class="text-lg font-bold text-rose-900 mb-3">감정 분석</h2>
+          <h2 class="text-lg font-bold text-rose-800 mb-3">감정 분석</h2>
           <div class="space-y-2">
             <div v-for="(val, key) in call.emotions" :key="key"
               class="flex justify-between text-sm">
               <span class="text-pink-400/70">{{ key }}</span>
-              <span class="text-rose-900 font-medium">{{ val }}</span>
+              <span class="text-rose-800 font-medium">{{ val }}</span>
             </div>
           </div>
         </CardWrapper>
 
         <CardWrapper v-if="call.keywords?.length">
-          <h2 class="text-lg font-bold text-rose-900 mb-3">키워드</h2>
+          <h2 class="text-lg font-bold text-rose-800 mb-3">키워드</h2>
           <div class="flex flex-wrap gap-2">
             <span v-for="kw in call.keywords" :key="kw"
               class="bg-sky-50 text-sky-500 text-sm px-3 py-1 rounded-full border border-sky-200">

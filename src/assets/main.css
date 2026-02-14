@@ -1,20 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #f472b6;
-  --color-primary-dark: #ec4899;
-  --color-primary-light: #fbcfe8;
-  --color-accent: #7dd3fc;
-  --color-accent-dark: #38bdf8;
-  --color-accent-light: #bae6fd;
+  --color-primary: #f9a8d4;
+  --color-primary-dark: #f472b6;
+  --color-primary-light: #fce7f3;
+  --color-accent: #93c5fd;
+  --color-accent-dark: #60a5fa;
+  --color-accent-light: #dbeafe;
   --color-lavender: #c4b5fd;
-  --color-bg: #fff5f7;
-  --color-bg-blue: #eff6ff;
+  --color-mint: #a7f3d0;
+  --color-peach: #fed7aa;
+  --color-bg: #fffbfe;
+  --color-bg-blue: #f0f9ff;
   --color-card: #ffffff;
   --color-card-border: #fce7f3;
-  --color-text-primary: #831843;
-  --color-text-secondary: #9d174d;
-  --color-text-muted: #be185d;
+  --color-text-primary: #4a2040;
+  --color-text-secondary: #6b3a5c;
+  --color-text-muted: #a855a0;
 }
 
 html, body, #app {
@@ -24,7 +26,7 @@ html, body, #app {
   overflow: hidden;
 }
 
-/* Custom scrollbar - pink theme */
+/* Custom scrollbar - soft pastel pink */
 ::-webkit-scrollbar {
   width: 4px;
 }
@@ -54,9 +56,9 @@ html, body, #app {
   filter: brightness(1.1);
 }
 
-/* Cute cloud-like soft shadows with pink tint */
+/* Soft dreamy cloud shadows */
 .card-cute {
-  box-shadow: 0 2px 15px rgba(244, 114, 182, 0.12), 0 1px 4px rgba(244, 114, 182, 0.08);
+  box-shadow: 0 2px 16px rgba(249, 168, 212, 0.10), 0 1px 6px rgba(147, 197, 253, 0.08);
 }
 
 /* Pulse glow for online indicator */
@@ -68,7 +70,7 @@ html, body, #app {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Floating hearts animation */
+/* Floating hearts animation - gentle and dreamy */
 @keyframes float-heart {
   0% { transform: translateY(0) scale(1); opacity: 0.7; }
   50% { transform: translateY(-8px) scale(1.05); opacity: 1; }
@@ -89,15 +91,24 @@ html, body, #app {
   animation: float-heart 2.5s ease-in-out infinite;
 }
 
-/* Gradient text for MAUM branding */
+/* Sparkle twinkle for highlighted elements */
+@keyframes sparkle {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+.sparkle-node {
+  animation: sparkle 1.2s ease-in-out infinite;
+}
+
+/* Gradient text for MAUM branding - brighter spring feel */
 .text-gradient-pink {
-  background: linear-gradient(135deg, #ec4899, #f472b6, #a78bfa);
+  background: linear-gradient(135deg, #f472b6, #f9a8d4, #c4b5fd);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* Decorative heart background radials */
+/* Decorative heart background radials - lighter and softer */
 .heart-bg {
   position: relative;
 }
@@ -109,25 +120,34 @@ html, body, #app {
   top: 0;
   left: 0;
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(244, 114, 182, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(125, 211, 252, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(196, 181, 253, 0.04) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 20%, rgba(249, 168, 212, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(147, 197, 253, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(196, 181, 253, 0.05) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* Send button gradient */
+/* Send button gradient - brighter and warmer */
 .btn-send {
-  background: linear-gradient(135deg, #f472b6, #ec4899);
+  background: linear-gradient(135deg, #f9a8d4, #f472b6);
   transition: all 0.2s;
 }
 .btn-send:hover {
-  background: linear-gradient(135deg, #ec4899, #db2777);
+  background: linear-gradient(135deg, #f472b6, #ec4899);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+  box-shadow: 0 4px 12px rgba(244, 114, 182, 0.25);
 }
 .btn-send:disabled {
   background: #fce7f3;
   transform: none;
   box-shadow: none;
+}
+
+/* Graph search highlight glow */
+@keyframes node-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(244, 114, 182, 0.5)); }
+  50% { filter: drop-shadow(0 0 10px rgba(244, 114, 182, 0.8)); }
+}
+.graph-highlight {
+  animation: node-glow 1.5s ease-in-out infinite;
 }

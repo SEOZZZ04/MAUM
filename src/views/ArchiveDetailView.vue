@@ -52,7 +52,7 @@ onMounted(async () => {
         </svg>
       </button>
       <div>
-        <h1 class="text-lg font-bold text-rose-900">{{ day?.title_override || day?.title || day?.date || '...' }}</h1>
+        <h1 class="text-lg font-bold text-rose-800">{{ day?.title_override || day?.title || day?.date || '...' }}</h1>
         <p class="text-xs text-pink-400/70">{{ day?.date }}</p>
       </div>
     </div>
@@ -78,7 +78,7 @@ onMounted(async () => {
           <div class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed"
             :class="isMe(msg)
               ? 'bg-gradient-to-br from-pink-400 to-rose-400 text-white rounded-br-md shadow-sm shadow-pink-200'
-              : 'bg-white text-rose-900 rounded-bl-md border border-sky-100 shadow-sm shadow-sky-100/50'">
+              : 'bg-white text-rose-800 rounded-bl-md border border-sky-100 shadow-sm shadow-sky-100/50'">
             {{ msg.text }}
           </div>
           <p class="text-[10px] mt-1 text-pink-300/60" :class="isMe(msg) ? 'text-right' : ''">

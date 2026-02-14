@@ -62,7 +62,7 @@ if (typeof window !== 'undefined') {
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-gradient-to-b from-pink-50 via-rose-50/30 to-sky-50/20 text-rose-950">
+  <div class="h-full flex flex-col bg-gradient-to-b from-pink-50/60 via-white to-sky-50/30 text-rose-800">
     <!-- Loading -->
     <div v-if="auth.loading" class="flex-1 flex flex-col items-center justify-center">
       <div class="flex gap-2 mb-4">

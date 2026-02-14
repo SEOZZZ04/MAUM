@@ -47,7 +47,7 @@ function formatDate(d) {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
       </button>
-      <h1 class="text-xl font-bold text-rose-900">아카이브</h1>
+      <h1 class="text-xl font-bold text-rose-800">아카이브</h1>
     </div>
 
     <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
@@ -61,7 +61,7 @@ function formatDate(d) {
         <div class="flex justify-between items-start">
           <div>
             <p class="text-xs text-pink-400">{{ formatDate(day.date) }}</p>
-            <h3 class="font-bold text-rose-900 mt-1">{{ day.title_override || day.title || day.date }}</h3>
+            <h3 class="font-bold text-rose-800 mt-1">{{ day.title_override || day.title || day.date }}</h3>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-xs bg-pink-50 text-pink-400 px-2 py-0.5 rounded-full border border-pink-200">archived</span>

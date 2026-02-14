@@ -102,20 +102,20 @@ function copyCode() {
     <div class="px-4 pb-8 space-y-4">
       <!-- Profile -->
       <CardWrapper>
-        <h3 class="font-bold text-rose-900 mb-3">프로필</h3>
+        <h3 class="font-bold text-rose-800 mb-3">프로필</h3>
         <div class="flex items-center gap-3 mb-4">
           <div class="w-12 h-12 rounded-full bg-gradient-to-br from-pink-200 to-sky-200 flex items-center justify-center text-pink-600 text-xl font-bold">
             {{ auth.profile?.nickname?.[0] || '?' }}
           </div>
           <div>
-            <p class="font-medium text-rose-900">{{ auth.profile?.nickname }}</p>
+            <p class="font-medium text-rose-800">{{ auth.profile?.nickname }}</p>
             <p class="text-xs text-pink-400/70">{{ auth.user?.email }}</p>
             <p v-if="auth.isGuest" class="text-xs text-pink-500 font-medium">게스트 계정</p>
           </div>
         </div>
         <div class="flex gap-2">
           <input v-model="nickname" placeholder="닉네임"
-            class="flex-1 bg-pink-50/50 text-rose-900 text-sm rounded-lg px-3 py-2 border border-pink-200 focus:border-pink-400 focus:outline-none" />
+            class="flex-1 bg-pink-50/50 text-rose-800 text-sm rounded-lg px-3 py-2 border border-pink-200 focus:border-pink-400 focus:outline-none" />
           <button @click="saveNickname" class="bg-pink-400 hover:bg-pink-500 text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium">
             저장
           </button>
@@ -124,7 +124,7 @@ function copyCode() {
 
       <!-- Couple Status -->
       <CardWrapper>
-        <h3 class="font-bold text-rose-900 mb-3">커플 연동</h3>
+        <h3 class="font-bold text-rose-800 mb-3">커플 연동</h3>
         <div v-if="couple.isConnected" class="text-green-600 flex items-center gap-2 mb-3">
           <span class="w-2 h-2 rounded-full bg-green-500 pulse-online"></span>
           연결됨 — {{ couple.partner?.nickname || '상대방' }}
@@ -175,7 +175,7 @@ function copyCode() {
             <p class="text-sm text-pink-400/70 mb-2">상대방의 초대코드 입력</p>
             <div class="flex gap-2">
               <input v-model="redeemCode" placeholder="초대코드 입력"
-                class="flex-1 bg-pink-50/50 text-rose-900 text-sm rounded-lg px-3 py-2 border border-pink-200 focus:border-pink-400 focus:outline-none" />
+                class="flex-1 bg-pink-50/50 text-rose-800 text-sm rounded-lg px-3 py-2 border border-pink-200 focus:border-pink-400 focus:outline-none" />
               <button @click="redeem" class="bg-sky-400 hover:bg-sky-500 text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium">
                 입력
               </button>
@@ -188,7 +188,7 @@ function copyCode() {
 
       <!-- Kakao Upload -->
       <CardWrapper v-if="couple.isConnected">
-        <h3 class="font-bold text-rose-900 mb-3">카카오톡 대화 업로드</h3>
+        <h3 class="font-bold text-rose-800 mb-3">카카오톡 대화 업로드</h3>
         <p class="text-xs text-pink-400/70 mb-3">카카오톡에서 내보낸 TXT 파일을 업로드하세요</p>
         <label class="block w-full bg-pink-50 hover:bg-pink-100 text-pink-600 font-semibold py-3 rounded-xl text-center cursor-pointer text-sm transition-colors border border-pink-200">
           {{ uploadingKakao ? '업로드 중...' : 'TXT 파일 선택' }}
@@ -207,7 +207,7 @@ function copyCode() {
 
       <!-- Admin Link -->
       <CardWrapper v-if="auth.isAdmin">
-        <router-link to="/admin" class="flex items-center justify-between text-rose-900">
+        <router-link to="/admin" class="flex items-center justify-between text-rose-800">
           <span class="font-bold">관리자 대시보드</span>
           <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
