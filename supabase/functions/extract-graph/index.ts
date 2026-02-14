@@ -50,55 +50,90 @@ serve(async (req) => {
 
     // Upsert nodes
     const nodeIds: Record<string, string> = {}
-    for (const node of extraction.nodes) {
-      const { data, error } = await admin
+    for (const node of (extraction.nodes || [])) {
+      // First check if node exists
+      const { data: existing } = await admin
         .from('graph_nodes')
-        .upsert({
-          couple_id: coupleId,
-          label: node.label,
-          type: node.type,
-          weight: 1,
-          last_seen_at: new Date().toISOString(),
-        }, { onConflict: 'couple_id,label,type' })
-        .select('id')
-        .single()
+        .select('id, weight')
+        .eq('couple_id', coupleId)
+        .eq('label', node.label)
+        .eq('type', node.type)
+        .maybeSingle()
 
-      if (!error && data) {
-        nodeIds[`${node.label}:${node.type}`] = data.id
-        // Increment weight for existing
-        await admin.rpc('increment_node_weight', { node_id: data.id }).catch(() => {
-          // If RPC doesn't exist, update directly
-          admin.from('graph_nodes')
-            .update({ weight: data.id ? 1 : 1 })
-            .eq('id', data.id)
-        })
+      if (existing) {
+        // Update weight and last_seen_at
+        await admin
+          .from('graph_nodes')
+          .update({
+            weight: existing.weight + 1,
+            last_seen_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id)
+        nodeIds[`${node.label}:${node.type}`] = existing.id
+      } else {
+        // Insert new node
+        const { data, error } = await admin
+          .from('graph_nodes')
+          .insert({
+            couple_id: coupleId,
+            label: node.label,
+            type: node.type,
+            weight: 1,
+            last_seen_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single()
+
+        if (!error && data) {
+          nodeIds[`${node.label}:${node.type}`] = data.id
+        }
       }
     }
 
     // Upsert edges
-    for (const edge of extraction.edges) {
+    let edgesCreated = 0
+    for (const edge of (extraction.edges || [])) {
       const sourceId = nodeIds[`${edge.source}:${edge.source_type}`]
       const targetId = nodeIds[`${edge.target}:${edge.target_type}`]
       if (!sourceId || !targetId) continue
 
-      await admin
+      // Check if edge exists
+      const { data: existingEdge } = await admin
         .from('graph_edges')
-        .upsert({
-          couple_id: coupleId,
-          source_node_id: sourceId,
-          target_node_id: targetId,
-          relation: edge.relation,
-          weight: 1,
-          last_seen_at: new Date().toISOString(),
-          evidence: source_info ? [source_info] : [],
-        }, { onConflict: 'couple_id,source_node_id,target_node_id,relation' })
-        .select()
-        .single()
+        .select('id, weight')
+        .eq('couple_id', coupleId)
+        .eq('source_node_id', sourceId)
+        .eq('target_node_id', targetId)
+        .eq('relation', edge.relation)
+        .maybeSingle()
+
+      if (existingEdge) {
+        await admin
+          .from('graph_edges')
+          .update({
+            weight: existingEdge.weight + 1,
+            last_seen_at: new Date().toISOString(),
+          })
+          .eq('id', existingEdge.id)
+      } else {
+        await admin
+          .from('graph_edges')
+          .insert({
+            couple_id: coupleId,
+            source_node_id: sourceId,
+            target_node_id: targetId,
+            relation: edge.relation,
+            weight: 1,
+            last_seen_at: new Date().toISOString(),
+            evidence: source_info ? [source_info] : [],
+          })
+      }
+      edgesCreated++
     }
 
     return new Response(JSON.stringify({
-      nodes_count: extraction.nodes.length,
-      edges_count: extraction.edges.length,
+      nodes_count: extraction.nodes?.length || 0,
+      edges_count: edgesCreated,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

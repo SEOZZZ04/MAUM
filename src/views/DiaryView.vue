@@ -120,11 +120,11 @@ function formatDate(d) {
           <div class="flex justify-between items-start mb-2">
             <div>
               <p class="text-xs text-pink-400">{{ formatDate(s.date) }}</p>
-              <h3 class="font-bold text-rose-900">{{ s.title_override || s.title || '제목 없음' }}</h3>
+              <h3 class="font-bold text-rose-800">{{ s.title_override || s.title || '제목 없음' }}</h3>
             </div>
             <button @click="editTitle(s)" class="text-xs text-pink-400 hover:text-pink-600">수정</button>
           </div>
-          <p class="text-sm text-rose-800/80 line-clamp-3">{{ s.diary_text }}</p>
+          <p class="text-sm text-rose-700/80 line-clamp-3">{{ s.diary_text }}</p>
           <div v-if="s.mood" class="mt-2 flex gap-1 flex-wrap">
             <span v-for="(val, key) in s.mood" :key="key"
               class="text-xs bg-pink-50 rounded-full px-2 py-0.5 text-pink-500">
@@ -149,7 +149,7 @@ function formatDate(d) {
         <CardWrapper v-for="call in diary.callLogs" :key="call.id"
           class="cursor-pointer" @click="router.push(`/diary/call/${call.id}`)">
           <p class="text-xs text-sky-400">{{ formatDate(call.occurred_at) }}</p>
-          <h3 class="font-bold text-rose-900 mt-1">{{ call.summary?.slice(0, 60) || '통화 기록' }}...</h3>
+          <h3 class="font-bold text-rose-800 mt-1">{{ call.summary?.slice(0, 60) || '통화 기록' }}...</h3>
           <div v-if="call.keywords" class="mt-2 flex flex-wrap gap-1">
             <span v-for="kw in (Array.isArray(call.keywords) ? call.keywords.slice(0, 5) : [])" :key="kw"
               class="text-xs bg-sky-50 text-sky-500 rounded-full px-2 py-0.5">

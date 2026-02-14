@@ -3,16 +3,22 @@ import { supabase } from './supabase'
 async function callEdgeFunction(name, body = {}) {
   const { data, error } = await supabase.functions.invoke(name, { body })
   if (error) {
+    // Try to extract meaningful error message from response body
+    let errorMessage = error.message || 'Edge Function 호출 실패'
     if (error.context?.body) {
       try {
-        const text = await error.context.body.text?.() || error.context.body
-        const parsed = JSON.parse(typeof text === 'string' ? text : JSON.stringify(text))
-        if (parsed.error) throw new Error(parsed.error)
-      } catch (parseErr) {
-        if (parseErr.message && parseErr.message !== 'Unexpected token') throw parseErr
+        const text = typeof error.context.body.text === 'function'
+          ? await error.context.body.text()
+          : (typeof error.context.body === 'string' ? error.context.body : null)
+        if (text) {
+          const parsed = JSON.parse(text)
+          if (parsed.error) errorMessage = parsed.error
+        }
+      } catch {
+        // JSON parsing failed - use the original error message
       }
     }
-    throw new Error(error.message || 'Edge Function 호출 실패')
+    throw new Error(errorMessage)
   }
   if (data?.error) throw new Error(data.error)
   return data
@@ -32,8 +38,9 @@ async function callWithFallback(rpcName, rpcParams, edgeName, edgeBody) {
     console.warn(`RPC ${rpcName} failed, trying edge function:`, rpcError.message)
     try {
       return await callEdgeFunction(edgeName, edgeBody)
-    } catch {
-      throw rpcError
+    } catch (edgeError) {
+      // Throw the more informative error
+      throw new Error(edgeError.message || rpcError.message)
     }
   }
 }

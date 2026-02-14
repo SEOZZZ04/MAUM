@@ -12,6 +12,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => profile.value?.role === 'admin')
   const userId = computed(() => user.value?.id)
 
+  let _visibilityHandlerAdded = false
+
   async function init() {
     loading.value = true
     try {
@@ -38,25 +40,33 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
     // Handle visibility change - refresh session when returning to tab
-    document.addEventListener('visibilitychange', async () => {
-      if (document.visibilityState === 'visible' && user.value) {
-        try {
-          // Try getSession first (uses cached/stored session)
-          let { data: { session } } = await supabase.auth.getSession()
-          if (session?.user) {
-            user.value = session.user
-          } else {
-            // If no session found, try refreshing the token
-            const { data } = await supabase.auth.refreshSession()
-            if (data.session?.user) {
-              user.value = data.session.user
+    // Only add once to prevent duplicate listeners
+    if (!_visibilityHandlerAdded) {
+      _visibilityHandlerAdded = true
+      let _refreshing = false
+      document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && user.value && !_refreshing) {
+          _refreshing = true
+          try {
+            // Try getSession first (uses cached/stored session)
+            let { data: { session } } = await supabase.auth.getSession()
+            if (session?.user) {
+              user.value = session.user
+            } else {
+              // If no session found, try refreshing the token
+              const { data } = await supabase.auth.refreshSession()
+              if (data.session?.user) {
+                user.value = data.session.user
+              }
             }
+          } catch (e) {
+            console.error('Session refresh error:', e)
+          } finally {
+            _refreshing = false
           }
-        } catch (e) {
-          console.error('Session refresh error:', e)
         }
-      }
-    })
+      })
+    }
   }
 
   async function fetchProfile() {
@@ -85,11 +95,6 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('maum_guest_password')
 
     // Use Supabase Anonymous Sign-In (no email/password needed)
-    // This method:
-    // - Has no rate limiting issues
-    // - Automatically manages sessions in localStorage
-    // - Creates a unique anonymous user per device
-    // - Can be converted to a real account later if needed
     const { data, error } = await supabase.auth.signInAnonymously({
       options: {
         data: {

@@ -32,7 +32,7 @@ async function loginGuest() {
 </script>
 
 <template>
-  <div class="h-full flex flex-col items-center justify-center px-6 bg-gradient-to-b from-pink-50 via-rose-50/50 to-sky-50/30 heart-bg relative overflow-hidden">
+  <div class="h-full flex flex-col items-center justify-center px-6 bg-gradient-to-b from-pink-50/60 via-white to-sky-50/40 heart-bg relative overflow-hidden">
     <!-- Decorative floating hearts -->
     <div class="absolute top-12 left-8 text-pink-300/40 text-2xl float-heart select-none pointer-events-none">&#x2764;</div>
     <div class="absolute top-20 right-12 text-sky-300/40 text-xl float-heart-delay select-none pointer-events-none">&#x2764;</div>
@@ -49,8 +49,8 @@ async function loginGuest() {
       <h1 class="text-5xl font-black text-gradient-pink mb-2">
         MAUM
       </h1>
-      <p class="text-rose-700/70 text-lg font-medium">커플 관계 분석 & 지식 그래프</p>
-      <p class="text-pink-400/60 text-sm mt-1">마음을 나누는 따뜻한 공간</p>
+      <p class="text-rose-500/70 text-lg font-medium">커플 관계 분석 & 지식 그래프</p>
+      <p class="text-pink-400/80 text-sm mt-1">마음을 나누는 따뜻한 공간</p>
     </div>
 
     <div class="w-full max-w-sm space-y-3 relative z-10">

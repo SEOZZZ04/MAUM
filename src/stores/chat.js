@@ -14,24 +14,36 @@ export const useChatStore = defineStore('chat', () => {
   // Track messages since last graph extraction
   let _messagesSinceExtraction = 0
   const EXTRACT_EVERY_N_MESSAGES = 5
+  // Prevent concurrent initialization
+  let _initPromise = null
 
   async function ensureTodayThread() {
     const data = await api.ensureTodayThread()
-    todayThread.value = data.day
-    return data.day
+    // Handle both RPC (returns {day: {...}}) and direct responses
+    const day = data?.day || data
+    if (day?.id) {
+      todayThread.value = day
+      return day
+    }
+    throw new Error('오늘의 대화방을 생성할 수 없습니다')
   }
 
   async function loadMessages(dayId) {
+    if (!dayId) return
     loading.value = true
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*, profiles:sender_user_id(nickname, avatar_url)')
-      .eq('day_id', dayId)
-      .order('created_at', { ascending: true })
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*, profiles:sender_user_id(nickname, avatar_url)')
+        .eq('day_id', dayId)
+        .order('created_at', { ascending: true })
 
-    // Only replace messages if query succeeded - prevents data loss on stale connections
-    if (!error && data) {
-      messages.value = data
+      // Only replace messages if query succeeded - prevents data loss on stale connections
+      if (!error && data) {
+        messages.value = data
+      }
+    } catch (e) {
+      console.error('Failed to load messages:', e)
     }
     loading.value = false
   }
@@ -41,6 +53,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!todayThread.value || !couple.coupleId) return
 
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('인증이 필요합니다')
 
     const { error } = await supabase.from('messages').insert({
       couple_id: couple.coupleId,
@@ -87,6 +100,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function subscribeToMessages(dayId) {
+    if (!dayId) return
     // Don't re-subscribe if already subscribed to this day
     if (_subscribedDayId === dayId && realtimeChannel) return
     unsubscribe()
@@ -140,14 +154,47 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  // Full initialization - ensures thread, loads messages, subscribes
+  async function initChat() {
+    // Prevent concurrent initializations
+    if (_initPromise) return _initPromise
+    _initPromise = _doInitChat()
+    try {
+      return await _initPromise
+    } finally {
+      _initPromise = null
+    }
+  }
+
+  async function _doInitChat() {
+    try {
+      const day = await ensureTodayThread()
+      if (day) {
+        await loadMessages(day.id)
+        subscribeToMessages(day.id)
+        return day
+      }
+    } catch (e) {
+      console.error('Chat init error:', e)
+    }
+    return null
+  }
+
   // Reconnect realtime after tab becomes visible again
   async function reconnect() {
-    if (!todayThread.value) return
+    if (!todayThread.value) {
+      // No thread yet - do full init
+      return await initChat()
+    }
 
     // Refresh auth session first
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
+      if (!session) {
+        // Try to refresh
+        const { data } = await supabase.auth.refreshSession()
+        if (!data.session) return
+      }
     } catch {
       return
     }
@@ -177,6 +224,6 @@ export const useChatStore = defineStore('chat', () => {
     messages, todayThread, loading, extractingGraph,
     ensureTodayThread, loadMessages, sendMessage,
     subscribeToMessages, unsubscribe, reconnect,
-    archiveToday, triggerGraphExtraction
+    archiveToday, triggerGraphExtraction, initChat
   }
 })

@@ -28,7 +28,7 @@ onMounted(async () => {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
       </button>
-      <h1 class="text-xl font-bold text-rose-900">관리자 대시보드</h1>
+      <h1 class="text-xl font-bold text-rose-800">관리자 대시보드</h1>
     </div>
 
     <div class="px-4 pb-8 space-y-4">
@@ -40,7 +40,7 @@ onMounted(async () => {
         <div class="grid grid-cols-2 gap-3">
           <CardWrapper>
             <p class="text-xs text-rose-500/70">전체 유저</p>
-            <p class="text-2xl font-bold text-rose-900">{{ metrics.total_users || 0 }}</p>
+            <p class="text-2xl font-bold text-rose-800">{{ metrics.total_users || 0 }}</p>
           </CardWrapper>
           <CardWrapper>
             <p class="text-xs text-rose-500/70">전체 커플</p>
@@ -57,25 +57,25 @@ onMounted(async () => {
         </div>
 
         <!-- Couple details -->
-        <h2 class="text-lg font-bold text-rose-900 mt-4">커플별 상세</h2>
+        <h2 class="text-lg font-bold text-rose-800 mt-4">커플별 상세</h2>
         <CardWrapper v-for="c in (metrics.couples || [])" :key="c.couple_id">
           <div class="flex justify-between items-start">
             <div>
-              <h3 class="font-bold text-rose-900">{{ c.members?.join(', ') || 'N/A' }}</h3>
+              <h3 class="font-bold text-rose-800">{{ c.members?.join(', ') || 'N/A' }}</h3>
               <p class="text-xs text-rose-500/70">커플 ID: {{ c.couple_id?.slice(0, 8) }}...</p>
             </div>
           </div>
           <div class="grid grid-cols-3 gap-2 mt-3">
             <div class="text-center">
-              <p class="text-lg font-bold text-rose-900">{{ c.message_count || 0 }}</p>
+              <p class="text-lg font-bold text-rose-800">{{ c.message_count || 0 }}</p>
               <p class="text-xs text-rose-500/70">메시지</p>
             </div>
             <div class="text-center">
-              <p class="text-lg font-bold text-rose-900">{{ c.diary_count || 0 }}</p>
+              <p class="text-lg font-bold text-rose-800">{{ c.diary_count || 0 }}</p>
               <p class="text-xs text-rose-500/70">일기</p>
             </div>
             <div class="text-center">
-              <p class="text-lg font-bold text-rose-900">{{ c.node_count || 0 }}</p>
+              <p class="text-lg font-bold text-rose-800">{{ c.node_count || 0 }}</p>
               <p class="text-xs text-rose-500/70">그래프 노드</p>
             </div>
           </div>

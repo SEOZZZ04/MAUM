@@ -1,5 +1,5 @@
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!
-const MODEL = 'gpt-5-mini'
+const MODEL = 'gpt-4o-mini'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -10,6 +10,10 @@ export async function chatCompletion(
   messages: ChatMessage[],
   options: { temperature?: number; max_tokens?: number; json_mode?: boolean } = {}
 ): Promise<string> {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY 환경변수가 설정되지 않았습니다')
+  }
+
   const body: Record<string, unknown> = {
     model: MODEL,
     messages,
@@ -32,10 +36,13 @@ export async function chatCompletion(
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`OpenAI API error: ${res.status} ${err}`)
+    throw new Error(`OpenAI API error (${res.status}): ${err.slice(0, 200)}`)
   }
 
   const data = await res.json()
+  if (!data.choices?.[0]?.message?.content) {
+    throw new Error('OpenAI 응답이 비어있습니다')
+  }
   return data.choices[0].message.content
 }
 
@@ -44,5 +51,9 @@ export async function chatCompletionJSON<T = unknown>(
   options: { temperature?: number; max_tokens?: number } = {}
 ): Promise<T> {
   const content = await chatCompletion(messages, { ...options, json_mode: true })
-  return JSON.parse(content)
+  try {
+    return JSON.parse(content)
+  } catch {
+    throw new Error(`OpenAI JSON 파싱 실패: ${content.slice(0, 100)}`)
+  }
 }
