@@ -1,0 +1,42 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches:
+      - claude/greenfield-app-rebuild-DO8mX
+      - main
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          supabase secrets set --project-ref $SUPABASE_PROJECT_ID OPENAI_API_KEY=$OPENAI_API_KEY
+
+          supabase functions deploy create-invite-code --project-ref $SUPABASE_PROJECT_ID --no-verify-jwt
+          supabase functions deploy redeem-invite-code --project-ref $SUPABASE_PROJECT_ID --no-verify-jwt
+          supabase functions deploy ensure-today-thread --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy generate-day-title --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy generate-daily-summary --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy extract-graph --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy analyze-question --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy parse-kakao-txt --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy analyze-call-audio --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy admin-metrics --project-ref $SUPABASE_PROJECT_ID
+
+      - name: Deployment Complete
+        run: echo "All Edge Functions deployed successfully!"
