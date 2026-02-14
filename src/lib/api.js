@@ -25,6 +25,9 @@ export const api = {
   createInviteCode: () => callEdgeFunction('create-invite-code'),
   redeemInviteCode: (code) => callEdgeFunction('redeem-invite-code', { code }),
 
+  // Guest connection
+  acceptGuestConnection: (requestId) => callEdgeFunction('accept-guest-connection', { request_id: requestId }),
+
   // Today thread
   ensureTodayThread: () => callEdgeFunction('ensure-today-thread'),
 
