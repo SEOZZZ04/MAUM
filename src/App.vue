@@ -19,6 +19,8 @@ onMounted(async () => {
     // Set guest online status
     if (auth.isGuest) {
       await auth.setGuestOnline()
+      // Broadcast presence to lobby so other guests see us immediately
+      couple.broadcastPresence(true)
     }
   }
 })
