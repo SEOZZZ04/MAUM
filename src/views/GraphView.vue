@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useGraphStore } from '../stores/graph'
 import { useCoupleStore } from '../stores/couple'
 import { api } from '../lib/api'
@@ -19,7 +19,12 @@ const analysisLoading = ref(false)
 onMounted(async () => {
   if (couple.isConnected) {
     await graph.fetchGraph()
+    graph.subscribeToGraphChanges()
   }
+})
+
+onUnmounted(() => {
+  graph.unsubscribeFromGraphChanges()
 })
 
 function onSearch() {
