@@ -3,8 +3,15 @@ import { supabase } from './supabase'
 async function callEdgeFunction(name, body = {}) {
   const { data, error } = await supabase.functions.invoke(name, { body })
   if (error) {
-    // Try to extract meaningful error message from response body
     let errorMessage = error.message || 'Edge Function 호출 실패'
+
+    // Detect common deployment issues
+    if (error.message?.includes('non-2xx') || error.message?.includes('404') || error.message?.includes('FunctionsFetchError')) {
+      errorMessage = `Edge Function '${name}'이(가) 배포되지 않았습니다. Supabase에서 Edge Function을 배포해주세요.`
+      console.error(`[API] Edge Function '${name}' not deployed. Deploy with: supabase functions deploy ${name}`)
+    }
+
+    // Try to extract meaningful error message from response body
     if (error.context?.body) {
       try {
         const text = typeof error.context.body.text === 'function'
@@ -15,7 +22,7 @@ async function callEdgeFunction(name, body = {}) {
           if (parsed.error) errorMessage = parsed.error
         }
       } catch {
-        // JSON parsing failed - use the original error message
+        // JSON parsing failed - use the detected error message
       }
     }
     throw new Error(errorMessage)
@@ -26,7 +33,13 @@ async function callEdgeFunction(name, body = {}) {
 
 async function callRpc(name, params = {}) {
   const { data, error } = await supabase.rpc(name, params)
-  if (error) throw new Error(error.message)
+  if (error) {
+    // Detect if the RPC function doesn't exist
+    if (error.message?.includes('does not exist') || error.code === '42883') {
+      throw new Error(`RPC 함수 '${name}'이(가) 존재하지 않습니다. SQL 마이그레이션을 실행해주세요.`)
+    }
+    throw new Error(error.message)
+  }
   return data
 }
 
@@ -39,7 +52,6 @@ async function callWithFallback(rpcName, rpcParams, edgeName, edgeBody) {
     try {
       return await callEdgeFunction(edgeName, edgeBody)
     } catch (edgeError) {
-      // Throw the more informative error
       throw new Error(edgeError.message || rpcError.message)
     }
   }

@@ -20,7 +20,7 @@ onMounted(async () => {
     const [dayRes, msgRes] = await Promise.all([
       supabase.from('conversation_days').select('*').eq('id', props.dayId).single(),
       supabase.from('messages')
-        .select('*, profiles:sender_user_id(nickname, avatar_url)')
+        .select('*')
         .eq('day_id', props.dayId)
         .order('created_at', { ascending: true })
     ])
@@ -34,7 +34,23 @@ onMounted(async () => {
     if (msgRes.error) {
       loadError.value = '메시지를 불러올 수 없습니다: ' + msgRes.error.message
     } else {
-      messages.value = msgRes.data || []
+      // Fetch sender profiles separately (FK join doesn't work for sender_user_id)
+      const msgData = msgRes.data || []
+      const senderIds = [...new Set(msgData.map(m => m.sender_user_id).filter(Boolean))]
+      const profileMap = {}
+      if (senderIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, nickname, avatar_url')
+          .in('user_id', senderIds)
+        if (profiles) {
+          for (const p of profiles) profileMap[p.user_id] = p
+        }
+      }
+      messages.value = msgData.map(m => ({
+        ...m,
+        profiles: profileMap[m.sender_user_id] || null
+      }))
     }
   } catch (e) {
     loadError.value = '데이터 로딩 오류: ' + e.message

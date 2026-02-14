@@ -17,13 +17,70 @@ export const useChatStore = defineStore('chat', () => {
   const EXTRACT_EVERY_N_MESSAGES = 5
   // Prevent concurrent initialization
   let _initPromise = null
+  // Cache profiles to avoid repeated fetches
+  const _profileCache = {}
 
-  // Persist message counter across soft navigations
   function _persistMsgCount() {
     sessionStorage.setItem('maum_msg_count', String(_messagesSinceExtraction))
   }
 
+  // Fetch profile by user_id with caching
+  async function _fetchProfile(userId) {
+    if (!userId) return null
+    if (_profileCache[userId]) return _profileCache[userId]
+
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id, nickname, avatar_url')
+        .eq('user_id', userId)
+        .single()
+      if (data) {
+        _profileCache[userId] = data
+      }
+      return data
+    } catch {
+      return null
+    }
+  }
+
+  // Batch fetch profiles for multiple user IDs
+  async function _fetchProfiles(userIds) {
+    const unique = [...new Set(userIds.filter(Boolean))]
+    const missing = unique.filter(id => !_profileCache[id])
+
+    if (missing.length > 0) {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('user_id, nickname, avatar_url')
+          .in('user_id', missing)
+        if (data) {
+          for (const p of data) {
+            _profileCache[p.user_id] = p
+          }
+        }
+      } catch {
+        // Profile fetch failed - continue without profiles
+      }
+    }
+
+    const result = {}
+    for (const id of unique) {
+      result[id] = _profileCache[id] || null
+    }
+    return result
+  }
+
+  // Get KST date string (YYYY-MM-DD)
+  function _getKSTDateStr() {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
+  }
+
   async function ensureTodayThread() {
+    const couple = useCoupleStore()
+    if (!couple.coupleId) throw new Error('커플이 연동되지 않았습니다')
+
     // 1) Try RPC/Edge Function first
     try {
       const data = await api.ensureTodayThread()
@@ -37,14 +94,10 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     // 2) Fallback: query conversation_days directly
-    const couple = useCoupleStore()
-    if (!couple.coupleId) throw new Error('커플이 연동되지 않았습니다')
-
-    const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
-    const todayStr = today.toISOString().split('T')[0]
+    const todayStr = _getKSTDateStr()
 
     // Try to find existing non-archived day for today
-    const { data: existingDay, error: findError } = await supabase
+    const { data: existingDay } = await supabase
       .from('conversation_days')
       .select('*')
       .eq('couple_id', couple.coupleId)
@@ -57,7 +110,7 @@ export const useChatStore = defineStore('chat', () => {
       return existingDay
     }
 
-    // If no day exists, find the most recent non-archived day (could be yesterday if not yet archived)
+    // Find the most recent non-archived day (could be yesterday if not yet archived)
     const { data: recentDay } = await supabase
       .from('conversation_days')
       .select('*')
@@ -94,15 +147,25 @@ export const useChatStore = defineStore('chat', () => {
     if (!dayId) return
     loading.value = true
     try {
+      // Fetch messages WITHOUT profile join (avoids PGRST200 FK error)
+      // messages.sender_user_id references auth.users, NOT profiles,
+      // so PostgREST cannot resolve the FK join
       const { data, error } = await supabase
         .from('messages')
-        .select('*, profiles:sender_user_id(nickname, avatar_url)')
+        .select('*')
         .eq('day_id', dayId)
         .order('created_at', { ascending: true })
 
-      // Only replace messages if query succeeded - prevents data loss on stale connections
       if (!error && data) {
-        messages.value = data
+        // Batch-fetch sender profiles separately
+        const senderIds = data.map(m => m.sender_user_id)
+        const profileMap = await _fetchProfiles(senderIds)
+
+        // Attach profiles to each message
+        messages.value = data.map(m => ({
+          ...m,
+          profiles: profileMap[m.sender_user_id] || null
+        }))
       } else if (error) {
         console.error('Failed to load messages:', error)
       }
@@ -146,7 +209,6 @@ export const useChatStore = defineStore('chat', () => {
     _persistMsgCount()
 
     try {
-      // Gather last N messages as context for extraction
       const recentMessages = messages.value.slice(-10)
       const conversationText = recentMessages
         .map(m => `${m.profiles?.nickname || '?'}: ${m.text}`)
@@ -155,7 +217,7 @@ export const useChatStore = defineStore('chat', () => {
       const sourceInfo = {
         type: 'chat',
         day_id: todayThread.value?.id,
-        date: todayThread.value?.date || new Date().toISOString().split('T')[0]
+        date: todayThread.value?.date || _getKSTDateStr()
       }
 
       await api.extractGraph(conversationText, sourceInfo)
@@ -167,7 +229,6 @@ export const useChatStore = defineStore('chat', () => {
 
   function subscribeToMessages(dayId) {
     if (!dayId) return
-    // Don't re-subscribe if already subscribed to this day
     if (_subscribedDayId === dayId && realtimeChannel) return
     unsubscribe()
     _subscribedDayId = dayId
@@ -180,26 +241,15 @@ export const useChatStore = defineStore('chat', () => {
         table: 'messages',
         filter: `day_id=eq.${dayId}`
       }, async (payload) => {
-        // Prevent duplicate messages
         if (messages.value.some(m => m.id === payload.new.id)) return
 
-        // Fetch sender profile
-        let profileData = null
-        try {
-          const { data } = await supabase
-            .from('profiles')
-            .select('nickname, avatar_url')
-            .eq('user_id', payload.new.sender_user_id)
-            .single()
-          profileData = data
-        } catch {
-          // Profile fetch failed (RLS or network) - still show the message
-        }
+        // Fetch sender profile separately (not via FK join)
+        const profileData = await _fetchProfile(payload.new.sender_user_id)
+
         // Check again after async fetch to prevent race condition duplicates
         if (messages.value.some(m => m.id === payload.new.id)) return
         messages.value.push({ ...payload.new, profiles: profileData })
 
-        // Track incoming messages for graph extraction too
         _messagesSinceExtraction++
         _persistMsgCount()
         if (_messagesSinceExtraction >= EXTRACT_EVERY_N_MESSAGES) {
@@ -221,9 +271,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  // Full initialization - ensures thread, loads messages, subscribes
   async function initChat() {
-    // Prevent concurrent initializations
     if (_initPromise) return _initPromise
     _initPromise = _doInitChat()
     try {
@@ -246,8 +294,7 @@ export const useChatStore = defineStore('chat', () => {
       console.error('Chat init error:', e)
       initError.value = e.message || '채팅 초기화 실패'
 
-      // If ensureTodayThread failed but we have messages from before, keep them
-      // Try to at least load messages from any existing thread
+      // Fallback: try to load messages from any existing thread
       const couple = useCoupleStore()
       if (couple.coupleId && !todayThread.value) {
         try {
@@ -275,9 +322,7 @@ export const useChatStore = defineStore('chat', () => {
     return null
   }
 
-  // Reconnect realtime after tab becomes visible again
   async function reconnect() {
-    // Refresh auth session first
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
@@ -289,17 +334,12 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     if (!todayThread.value) {
-      // No thread yet - do full init
       return await initChat()
     }
 
     const dayId = todayThread.value.id
-
-    // Force re-subscribe by clearing tracked day
     _subscribedDayId = null
     subscribeToMessages(dayId)
-
-    // Reload messages
     await loadMessages(dayId)
   }
 
