@@ -1,17 +1,18 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
-import { getSupabaseClient } from '../_shared/supabase.ts'
+import { getSupabaseClient, getSupabaseAdmin } from '../_shared/supabase.ts'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
     const supabase = getSupabaseClient(req)
+    const admin = getSupabaseAdmin()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) throw new Error('Unauthorized')
 
     // Check if user already has a couple
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('couple_members')
       .select('couple_id')
       .eq('user_id', user.id)
@@ -25,7 +26,7 @@ serve(async (req) => {
       .join('')
       .toUpperCase()
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('couple_invites')
       .insert({
         inviter_user_id: user.id,
