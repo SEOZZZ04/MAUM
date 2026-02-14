@@ -10,8 +10,10 @@ export const useCoupleStore = defineStore('couple', () => {
   const loading = ref(false)
   const onlineGuests = ref([])
   const pendingRequests = ref([])
-  let guestChannel = null
+  let guestRequestsChannel = null
+  let lobbyBroadcastChannel = null
   let coupleChannel = null
+  let lobbyPollInterval = null
 
   const coupleId = computed(() => couple.value?.id)
   const isConnected = computed(() => !!couple.value)
@@ -51,7 +53,6 @@ export const useCoupleStore = defineStore('couple', () => {
         partner.value = partnerProfile
       }
 
-      // Subscribe to couple broadcast channel for disconnect notifications
       subscribeToCoupleChannel(membership.couple_id)
     } else {
       couple.value = null
@@ -70,7 +71,7 @@ export const useCoupleStore = defineStore('couple', () => {
     return result
   }
 
-  // Disconnect couple - delete all shared data
+  // Disconnect couple
   async function disconnectCouple() {
     if (!coupleId.value) return
 
@@ -83,13 +84,9 @@ export const useCoupleStore = defineStore('couple', () => {
         event: 'couple_disconnected',
         payload: {}
       })
-      // Small delay to ensure broadcast is sent
       await new Promise(r => setTimeout(r, 300))
     }
 
-    // Delete in correct order (respecting foreign keys)
-    // Tables with ON DELETE CASCADE from couples would auto-cascade,
-    // but explicit deletion ensures RLS policies are respected
     await supabase.from('graph_edges').delete().eq('couple_id', cid)
     await supabase.from('graph_nodes').delete().eq('couple_id', cid)
     await supabase.from('daily_summaries').delete().eq('couple_id', cid)
@@ -101,19 +98,17 @@ export const useCoupleStore = defineStore('couple', () => {
     await supabase.from('couple_members').delete().eq('couple_id', cid)
     await supabase.from('couples').delete().eq('id', cid)
 
-    // Cleanup local state
     unsubscribeFromCoupleChannel()
     couple.value = null
     partner.value = null
   }
 
-  // Subscribe to couple broadcast channel for disconnect notifications
+  // === Couple broadcast channel (for disconnect notifications) ===
   function subscribeToCoupleChannel(cid) {
     unsubscribeFromCoupleChannel()
     coupleChannel = supabase
       .channel(`couple:${cid}`)
       .on('broadcast', { event: 'couple_disconnected' }, () => {
-        // Partner disconnected - reset local state
         couple.value = null
         partner.value = null
         unsubscribeFromCoupleChannel()
@@ -128,7 +123,7 @@ export const useCoupleStore = defineStore('couple', () => {
     }
   }
 
-  // Guest connection system
+  // === Guest connection system ===
   async function fetchOnlineGuests() {
     const auth = useAuthStore()
     const { data } = await supabase
@@ -148,6 +143,15 @@ export const useCoupleStore = defineStore('couple', () => {
       status: 'pending'
     })
     if (error) throw error
+
+    // Broadcast to lobby so the target sees the request immediately
+    if (lobbyBroadcastChannel) {
+      lobbyBroadcastChannel.send({
+        type: 'broadcast',
+        event: 'lobby_update',
+        payload: { type: 'new_request', to: targetUserId, from: auth.userId }
+      })
+    }
   }
 
   async function fetchPendingRequests() {
@@ -163,10 +167,19 @@ export const useCoupleStore = defineStore('couple', () => {
   }
 
   async function acceptConnectionRequest(requestId) {
-    // Use edge function with admin client to bypass RLS
-    // (client-side INSERT can't add partner's couple_members row)
+    const auth = useAuthStore()
     const result = await api.acceptGuestConnection(requestId)
     await fetchCouple()
+
+    // Broadcast so the requester knows immediately
+    if (lobbyBroadcastChannel) {
+      lobbyBroadcastChannel.send({
+        type: 'broadcast',
+        event: 'lobby_update',
+        payload: { type: 'request_accepted', by: auth.userId }
+      })
+    }
+
     return result
   }
 
@@ -178,14 +191,15 @@ export const useCoupleStore = defineStore('couple', () => {
     await fetchPendingRequests()
   }
 
-  // Subscribe to real-time guest updates
+  // === Real-time subscriptions ===
+
   function subscribeToGuestUpdates() {
     unsubscribeFromGuestUpdates()
     const auth = useAuthStore()
 
-    guestChannel = supabase
-      .channel('guest-updates')
-      // 1) New connection request received
+    // Channel 1: Postgres Changes for DB events (works when Supabase Realtime is configured)
+    guestRequestsChannel = supabase
+      .channel('guest-db-changes')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -194,7 +208,6 @@ export const useCoupleStore = defineStore('couple', () => {
       }, () => {
         fetchPendingRequests()
       })
-      // 2) My sent request was answered
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -205,26 +218,15 @@ export const useCoupleStore = defineStore('couple', () => {
           fetchCouple()
         }
       })
-      // 3) Profile is_online changes - someone comes online/goes offline
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'profiles'
       }, (payload) => {
-        // Only care about is_online changes
         if (payload.old?.is_online !== payload.new?.is_online) {
           fetchOnlineGuests()
         }
       })
-      // 4) New profile created (new guest signed in)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'profiles'
-      }, () => {
-        fetchOnlineGuests()
-      })
-      // 5) I was added to a couple (partner accepted via invite code)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -233,13 +235,79 @@ export const useCoupleStore = defineStore('couple', () => {
       }, () => {
         fetchCouple()
       })
-      .subscribe()
+      .subscribe((status) => {
+        console.log('[Realtime DB] status:', status)
+      })
+
+    // Channel 2: Broadcast for instant lobby notifications
+    // (doesn't depend on Supabase Realtime publication config)
+    lobbyBroadcastChannel = supabase
+      .channel('guest-lobby')
+      .on('broadcast', { event: 'lobby_update' }, (payload) => {
+        const msg = payload.payload
+        if (msg.type === 'new_request' && msg.to === auth.userId) {
+          // Someone sent me a request
+          fetchPendingRequests()
+        } else if (msg.type === 'request_accepted') {
+          // Someone accepted a request - check if my couple status changed
+          fetchCouple()
+        } else if (msg.type === 'guest_online' || msg.type === 'guest_offline') {
+          fetchOnlineGuests()
+        }
+      })
+      .subscribe((status) => {
+        console.log('[Realtime Broadcast] status:', status)
+      })
+
+    // Channel 3: Periodic polling as safety net (every 5 seconds)
+    startLobbyPolling()
+  }
+
+  function startLobbyPolling() {
+    stopLobbyPolling()
+    lobbyPollInterval = setInterval(async () => {
+      // Only poll if not yet connected to a couple
+      if (!isConnected.value) {
+        await fetchOnlineGuests()
+        await fetchPendingRequests()
+      } else {
+        // Connected - no need to poll lobby anymore
+        stopLobbyPolling()
+      }
+    }, 5000)
+  }
+
+  function stopLobbyPolling() {
+    if (lobbyPollInterval) {
+      clearInterval(lobbyPollInterval)
+      lobbyPollInterval = null
+    }
   }
 
   function unsubscribeFromGuestUpdates() {
-    if (guestChannel) {
-      supabase.removeChannel(guestChannel)
-      guestChannel = null
+    if (guestRequestsChannel) {
+      supabase.removeChannel(guestRequestsChannel)
+      guestRequestsChannel = null
+    }
+    if (lobbyBroadcastChannel) {
+      supabase.removeChannel(lobbyBroadcastChannel)
+      lobbyBroadcastChannel = null
+    }
+    stopLobbyPolling()
+  }
+
+  // Broadcast online status change to lobby
+  function broadcastPresence(isOnline) {
+    if (lobbyBroadcastChannel) {
+      const auth = useAuthStore()
+      lobbyBroadcastChannel.send({
+        type: 'broadcast',
+        event: 'lobby_update',
+        payload: {
+          type: isOnline ? 'guest_online' : 'guest_offline',
+          userId: auth.userId
+        }
+      })
     }
   }
 
@@ -255,6 +323,7 @@ export const useCoupleStore = defineStore('couple', () => {
     fetchOnlineGuests, sendConnectionRequest,
     fetchPendingRequests, acceptConnectionRequest, rejectConnectionRequest,
     subscribeToGuestUpdates, unsubscribeFromGuestUpdates,
-    subscribeToCoupleChannel, unsubscribeFromCoupleChannel, cleanup
+    subscribeToCoupleChannel, unsubscribeFromCoupleChannel,
+    broadcastPresence, cleanup
   }
 })
