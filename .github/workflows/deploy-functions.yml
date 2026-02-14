@@ -1,0 +1,25 @@
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches:
+      - main # 혹은 사용하시는 브랜치명 (예: claude/greenfield-app-rebuild-DO8mX)
+    paths:
+      - 'supabase/functions/**' # 함수 코드가 변경될 때만 실행
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy all functions
+        run: |
+          supabase functions deploy --project-ref $SUPABASE_PROJECT_ID --force
