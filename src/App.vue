@@ -62,11 +62,15 @@ if (typeof window !== 'undefined') {
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-gradient-to-b from-amber-50 to-orange-50 text-amber-950">
+  <div class="h-full flex flex-col bg-gradient-to-b from-pink-50 via-rose-50/30 to-sky-50/20 text-rose-950">
     <!-- Loading -->
     <div v-if="auth.loading" class="flex-1 flex flex-col items-center justify-center">
-      <div class="text-5xl mb-3">🐿️</div>
-      <div class="animate-pulse text-amber-500 text-xl font-bold">MAUM</div>
+      <div class="flex gap-2 mb-4">
+        <span class="text-3xl float-heart text-pink-400">&#x2764;</span>
+        <span class="text-2xl float-heart-delay text-sky-400">&#x2764;</span>
+        <span class="text-3xl float-heart-delay-2 text-pink-300">&#x2764;</span>
+      </div>
+      <div class="animate-pulse text-gradient-pink text-xl font-bold">MAUM</div>
     </div>
 
     <!-- Main content -->

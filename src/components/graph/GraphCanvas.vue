@@ -15,13 +15,13 @@ let svg, simulation
 
 const typeColors = {
   person: '#ec4899',
-  topic: '#8b5cf6',
-  event: '#f59e0b',
-  emotion: '#ef4444',
-  habit: '#10b981',
-  value: '#3b82f6',
-  place: '#06b6d4',
-  plan: '#f97316'
+  topic: '#a78bfa',
+  event: '#fb923c',
+  emotion: '#f87171',
+  habit: '#34d399',
+  value: '#60a5fa',
+  place: '#22d3ee',
+  plan: '#fbbf24'
 }
 
 function buildGraph() {
@@ -69,9 +69,9 @@ function buildGraph() {
     .selectAll('line')
     .data(links)
     .join('line')
-    .attr('stroke', '#475569')
+    .attr('stroke', '#f9a8d4')
     .attr('stroke-width', d => Math.min(d.weight, 5))
-    .attr('stroke-opacity', 0.6)
+    .attr('stroke-opacity', 0.5)
 
   // Edge labels
   const linkLabel = g.append('g')
@@ -80,7 +80,7 @@ function buildGraph() {
     .join('text')
     .text(d => d.relation)
     .attr('font-size', '8px')
-    .attr('fill', '#64748b')
+    .attr('fill', '#9d174d')
     .attr('text-anchor', 'middle')
 
   // Nodes
@@ -90,7 +90,7 @@ function buildGraph() {
     .join('circle')
     .attr('r', d => Math.min(8 + d.weight * 2, 25))
     .attr('fill', d => typeColors[d.type] || '#888')
-    .attr('stroke', '#0f172a')
+    .attr('stroke', '#ffffff')
     .attr('stroke-width', 2)
     .attr('cursor', 'pointer')
     .on('click', (event, d) => emit('node-click', d))
@@ -113,7 +113,7 @@ function buildGraph() {
     .join('text')
     .text(d => d.label)
     .attr('font-size', '11px')
-    .attr('fill', '#e2e8f0')
+    .attr('fill', '#831843')
     .attr('dx', 12)
     .attr('dy', 4)
     .attr('pointer-events', 'none')
@@ -162,5 +162,5 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="container" class="w-full h-full bg-slate-950"></div>
+  <div ref="container" class="w-full h-full"></div>
 </template>
