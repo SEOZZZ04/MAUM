@@ -33,20 +33,41 @@ serve(async (req) => {
     const extraction = await chatCompletionJSON<GraphExtraction>([
       {
         role: 'system',
-        content: `커플 대화에서 지식 그래프를 추출합니다.
-노드 타입: person, topic, event, emotion, habit, value, place, plan
-관계 타입: causes, relates_to, triggers, resolves, prefers, avoids, conflicts_with, supports
+        content: `커플 대화에서 의미 있는 지식 그래프 노드와 관계를 추출합니다.
 
-반드시 JSON으로 응답:
+## 노드 타입
+person, topic, event, emotion, habit, value, place, plan
+
+## 관계 타입
+causes, relates_to, triggers, resolves, prefers, avoids, conflicts_with, supports
+
+## 추출 기준 (중요!)
+다음과 같은 **의미 있는 내용만** 추출하세요:
+- 새로운 사건이나 경험 (예: 여행 계획, 직장 문제, 가족 모임)
+- 감정 변화나 중요한 감정 표현 (예: 스트레스, 행복, 불안, 사랑)
+- 관계에 관한 정보 (가족, 친구, 직장 동료 등 인물)
+- 새로운 장소나 계획
+- 가치관이나 습관에 대한 언급
+- 갈등이나 갈등 해소
+
+다음은 **무시**하세요:
+- 단순 인사 (안녕, 잘 잤어?, 뭐해? 등)
+- 일상적인 짧은 응답 (ㅋㅋ, ㅇㅇ, 그래, 응 등)
+- 의미 없는 반복적인 대화
+- 음식 주문이나 단순 일상 보고 (밥 먹었어 등) - 단, 특별한 맥락이 있으면 추출
+
+대화에 의미 있는 내용이 없으면 빈 배열을 반환하세요.
+
+## 응답 형식 (반드시 JSON)
 {
   "nodes": [{"label": "노드명", "type": "person|topic|event|emotion|habit|value|place|plan"}],
   "edges": [{"source": "노드명", "source_type": "타입", "target": "노드명", "target_type": "타입", "relation": "관계타입"}]
 }
 
-핵심 개념만 추출하세요. 노드는 최대 15개, 엣지는 최대 20개.`
+노드는 최대 10개, 엣지는 최대 15개. 정말 의미 있는 것만 추출하세요.`
       },
       { role: 'user', content: text }
-    ], { temperature: 0.5 })
+    ], { temperature: 0.3 })
 
     // Upsert nodes
     const nodeIds: Record<string, string> = {}
