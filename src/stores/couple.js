@@ -156,14 +156,32 @@ export const useCoupleStore = defineStore('couple', () => {
 
   async function fetchPendingRequests() {
     const auth = useAuthStore()
-    const { data } = await supabase
+    // Don't use PostgREST join on from_user_id - FK goes to auth.users, not profiles
+    const { data, error } = await supabase
       .from('guest_connection_requests')
-      .select('*, from_profile:from_user_id(nickname)')
+      .select('*')
       .eq('to_user_id', auth.userId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
-    pendingRequests.value = data || []
-    return data || []
+
+    if (error) {
+      console.error('[fetchPendingRequests] error:', error)
+      return []
+    }
+
+    // Fetch sender profiles separately
+    const requests = data || []
+    for (const req of requests) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('nickname')
+        .eq('user_id', req.from_user_id)
+        .single()
+      req.from_profile = profile
+    }
+
+    pendingRequests.value = requests
+    return requests
   }
 
   async function acceptConnectionRequest(requestId) {
