@@ -15,7 +15,7 @@ serve(async (req) => {
       .from('couple_members')
       .select('couple_id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
     if (!membership) throw new Error('커플이 연동되지 않았습니다')
 
     const today = new Date().toISOString().split('T')[0]
@@ -27,7 +27,7 @@ serve(async (req) => {
       .eq('couple_id', membership.couple_id)
       .eq('date', today)
       .eq('archived', false)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       return new Response(JSON.stringify({ day: existing }), {

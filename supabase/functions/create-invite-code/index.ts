@@ -16,7 +16,7 @@ serve(async (req) => {
       .from('couple_members')
       .select('couple_id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (existing) throw new Error('이미 커플이 연동되어 있습니다')
 

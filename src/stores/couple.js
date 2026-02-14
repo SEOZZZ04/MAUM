@@ -22,7 +22,7 @@ export const useCoupleStore = defineStore('couple', () => {
       .from('couple_members')
       .select('couple_id')
       .eq('user_id', auth.userId)
-      .single()
+      .maybeSingle()
 
     if (membership) {
       const { data: coupleData } = await supabase

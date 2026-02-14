@@ -20,7 +20,7 @@ serve(async (req) => {
       .from('uploads')
       .select('*')
       .eq('id', upload_id)
-      .single()
+      .maybeSingle()
     if (!upload) throw new Error('Upload not found')
 
     const coupleId = upload.couple_id

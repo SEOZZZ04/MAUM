@@ -73,7 +73,7 @@ router.beforeEach(async (to) => {
       .from('profiles')
       .select('role')
       .eq('user_id', session.user.id)
-      .single()
+      .maybeSingle()
     if (profile?.role !== 'admin') return { name: 'Chat' }
   }
 

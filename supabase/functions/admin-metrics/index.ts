@@ -16,7 +16,7 @@ serve(async (req) => {
       .from('profiles')
       .select('role')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
     if (profile?.role !== 'admin') throw new Error('Forbidden: admin only')
 
     // Total users

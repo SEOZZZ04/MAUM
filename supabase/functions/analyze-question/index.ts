@@ -19,7 +19,7 @@ serve(async (req) => {
       .from('couple_members')
       .select('couple_id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
     if (!membership) throw new Error('커플이 연동되지 않았습니다')
 
     const coupleId = membership.couple_id

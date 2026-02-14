@@ -19,7 +19,7 @@ serve(async (req) => {
       .from('couple_members')
       .select('couple_id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
     if (existingCouple) throw new Error('이미 커플이 연동되어 있습니다')
 
     // Find invite
@@ -29,7 +29,7 @@ serve(async (req) => {
       .eq('code', code.trim().toUpperCase())
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
-      .single()
+      .maybeSingle()
 
     if (findError || !invite) throw new Error('유효하지 않거나 만료된 코드입니다')
     if (invite.inviter_user_id === user.id) throw new Error('자신의 코드는 사용할 수 없습니다')
