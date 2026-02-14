@@ -54,6 +54,11 @@ const routes = [
   {
     path: '/',
     redirect: '/chat'
+  },
+  // Catch-all: redirect unknown routes to /chat
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/chat'
   }
 ]
 
@@ -62,8 +67,36 @@ const router = createRouter({
   routes
 })
 
+// Track if initial auth check is done
+let authInitialized = false
+let authResolve = null
+const authReady = new Promise(resolve => { authResolve = resolve })
+
+// Listen for auth state changes
+supabase.auth.onAuthStateChange((event) => {
+  if (!authInitialized) {
+    authInitialized = true
+    authResolve()
+  }
+  // After OAuth callback redirect, navigate to chat
+  if (event === 'SIGNED_IN' && router.currentRoute.value.path === '/auth') {
+    router.push('/chat')
+  }
+})
+
+// Also resolve after getSession
+supabase.auth.getSession().then(() => {
+  if (!authInitialized) {
+    authInitialized = true
+    authResolve()
+  }
+})
+
 router.beforeEach(async (to) => {
   if (to.meta.public) return true
+
+  // Wait for auth to be initialized
+  await authReady
 
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return { name: 'Auth' }

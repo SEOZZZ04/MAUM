@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-slate-800/80 backdrop-blur rounded-2xl border border-slate-700/50 p-4">
+  <div class="bg-white/80 backdrop-blur rounded-2xl border border-amber-200/60 p-4 card-cute">
     <slot />
   </div>
 </template>

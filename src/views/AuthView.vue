@@ -1,9 +1,12 @@
 <script setup>
 import { useAuthStore } from '../stores/auth'
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
+const router = useRouter()
 const error = ref('')
+const guestLoading = ref(false)
 
 async function loginGoogle() {
   try {
@@ -14,29 +17,37 @@ async function loginGoogle() {
   }
 }
 
-async function loginKakao() {
+async function loginGuest() {
   try {
     error.value = ''
-    await auth.signInWithKakao()
+    guestLoading.value = true
+    await auth.signInAsGuest()
+    router.push('/chat')
   } catch (e) {
     error.value = e.message
+  } finally {
+    guestLoading.value = false
   }
 }
 </script>
 
 <template>
-  <div class="h-full flex flex-col items-center justify-center px-6 bg-gradient-to-b from-slate-950 to-slate-900">
-    <div class="text-center mb-12">
-      <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-rose-400 mb-3">
+  <div class="h-full flex flex-col items-center justify-center px-6 bg-gradient-to-b from-amber-50 to-orange-50">
+    <!-- Squirrel mascot -->
+    <div class="text-center mb-8">
+      <div class="text-7xl mb-3 animate-bounce" style="animation-duration: 2s;">🐿️</div>
+      <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-400 mb-2">
         MAUM
       </h1>
-      <p class="text-slate-400 text-lg">커플 관계 분석 & 지식 그래프</p>
+      <p class="text-amber-700/70 text-lg font-medium">커플 관계 분석 & 지식 그래프</p>
+      <p class="text-amber-600/50 text-sm mt-1">마음을 나누는 따뜻한 공간</p>
     </div>
 
-    <div class="w-full max-w-sm space-y-4">
+    <div class="w-full max-w-sm space-y-3">
+      <!-- Google Login -->
       <button
         @click="loginGoogle"
-        class="w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-semibold py-3 px-6 rounded-xl hover:bg-gray-100 transition-colors"
+        class="w-full flex items-center justify-center gap-3 bg-white text-gray-700 font-semibold py-3.5 px-6 rounded-2xl shadow-md shadow-amber-200/50 hover:shadow-lg hover:shadow-amber-200/60 hover:-translate-y-0.5 transition-all border border-amber-100"
       >
         <svg class="w-5 h-5" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -47,17 +58,29 @@ async function loginKakao() {
         Google로 로그인
       </button>
 
+      <!-- Divider -->
+      <div class="flex items-center gap-3 py-1">
+        <div class="flex-1 h-px bg-amber-200"></div>
+        <span class="text-amber-400 text-xs font-medium">또는</span>
+        <div class="flex-1 h-px bg-amber-200"></div>
+      </div>
+
+      <!-- Guest Login -->
       <button
-        @click="loginKakao"
-        class="w-full flex items-center justify-center gap-3 bg-[#FEE500] text-[#191919] font-semibold py-3 px-6 rounded-xl hover:bg-[#F5DC00] transition-colors"
+        @click="loginGuest"
+        :disabled="guestLoading"
+        class="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-amber-400 to-orange-400 text-white font-semibold py-3.5 px-6 rounded-2xl shadow-md shadow-orange-200/50 hover:shadow-lg hover:shadow-orange-300/60 hover:-translate-y-0.5 transition-all disabled:opacity-60 disabled:hover:translate-y-0"
       >
-        <svg class="w-5 h-5" viewBox="0 0 24 24">
-          <path fill="#191919" d="M12 3C6.48 3 2 6.48 2 10.5c0 2.53 1.66 4.74 4.14 6.04l-1.06 3.88c-.09.34.28.6.56.4L9.8 18.1c.72.13 1.45.2 2.2.2 5.52 0 10-3.48 10-7.8S17.52 3 12 3z"/>
-        </svg>
-        카카오로 로그인
+        <span class="text-lg">🐿️</span>
+        {{ guestLoading ? '접속 중...' : '게스트로 체험하기' }}
       </button>
+
+      <p class="text-center text-amber-600/50 text-xs mt-2">
+        게스트 계정은 이 기기에서 자동 생성되며,<br/>
+        다른 접속 중인 게스트와 연결하여 체험할 수 있어요!
+      </p>
     </div>
 
-    <p v-if="error" class="mt-4 text-red-400 text-sm text-center">{{ error }}</p>
+    <p v-if="error" class="mt-4 text-red-400 text-sm text-center bg-red-50 px-4 py-2 rounded-xl">{{ error }}</p>
   </div>
 </template>

@@ -25,11 +25,6 @@ enabled = false
 client_id = "env(GOOGLE_CLIENT_ID)"
 secret = "env(GOOGLE_CLIENT_SECRET)"
 
-[auth.external.kakao]
-enabled = false
-client_id = "env(KAKAO_CLIENT_ID)"
-secret = "env(KAKAO_CLIENT_SECRET)"
-
 [storage]
 enabled = true
 file_size_limit = "50MiB"
