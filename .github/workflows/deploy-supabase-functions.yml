@@ -7,36 +7,48 @@ on:
       - main
     paths:
       - 'supabase/functions/**'
+      - '.github/workflows/deploy-supabase-functions.yml'
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Deploy Edge Functions
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          supabase secrets set --project-ref $SUPABASE_PROJECT_ID OPENAI_API_KEY=$OPENAI_API_KEY
+      - name: Link Supabase project
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
 
-          supabase functions deploy create-invite-code --project-ref $SUPABASE_PROJECT_ID --no-verify-jwt
-          supabase functions deploy redeem-invite-code --project-ref $SUPABASE_PROJECT_ID --no-verify-jwt
-          supabase functions deploy ensure-today-thread --project-ref $SUPABASE_PROJECT_ID
-          supabase functions deploy generate-day-title --project-ref $SUPABASE_PROJECT_ID
-          supabase functions deploy generate-daily-summary --project-ref $SUPABASE_PROJECT_ID
-          supabase functions deploy extract-graph --project-ref $SUPABASE_PROJECT_ID
-          supabase functions deploy analyze-question --project-ref $SUPABASE_PROJECT_ID
-          supabase functions deploy parse-kakao-txt --project-ref $SUPABASE_PROJECT_ID
-          supabase functions deploy analyze-call-audio --project-ref $SUPABASE_PROJECT_ID
-          supabase functions deploy admin-metrics --project-ref $SUPABASE_PROJECT_ID
+      - name: Set Edge Function secrets
+        run: |
+          supabase secrets set \
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy all Edge Functions
+        run: |
+          FUNCTIONS=(
+            create-invite-code
+            redeem-invite-code
+            ensure-today-thread
+            generate-day-title
+            generate-daily-summary
+            extract-graph
+            analyze-question
+            parse-kakao-txt
+            analyze-call-audio
+            admin-metrics
+          )
+          for fn in "${FUNCTIONS[@]}"; do
+            echo "Deploying $fn..."
+            supabase functions deploy "$fn" --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+          done
 
       - name: Deployment Complete
         run: echo "All Edge Functions deployed successfully!"
