@@ -27,33 +27,64 @@ const requestSent = ref({})
 
 const isMe = (msg) => msg.sender_user_id === auth.userId
 
+// Initialize chat when couple is connected
+async function initChat() {
+  try {
+    const day = await chat.ensureTodayThread()
+    if (day) {
+      await chat.loadMessages(day.id)
+      chat.subscribeToMessages(day.id)
+      await nextTick()
+      scrollToBottom()
+    }
+  } catch (e) {
+    console.error('Chat init error:', e)
+  }
+}
+
 onMounted(async () => {
   if (!couple.isConnected) {
-    // If guest, load lobby data
     if (auth.isGuest) {
       await loadGuestLobby()
     }
     return
   }
-  const day = await chat.ensureTodayThread()
-  if (day) {
-    await chat.loadMessages(day.id)
-    chat.subscribeToMessages(day.id)
-    scrollToBottom()
-  }
+  await initChat()
 })
 
 onUnmounted(() => {
   chat.unsubscribe()
-})
-
-// Handle visibility change - reload messages when returning to tab
-watch(() => document.visibilityState, async () => {
-  if (document.visibilityState === 'visible' && couple.isConnected && chat.todayThread) {
-    await chat.loadMessages(chat.todayThread.id)
-    scrollToBottom()
+  // Remove visibility handler
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler)
   }
 })
+
+// Watch for couple connection change (e.g., partner accepted request while on this page)
+watch(() => couple.isConnected, async (connected, wasConnected) => {
+  if (connected && !wasConnected) {
+    // Just got connected - initialize chat
+    await initChat()
+  } else if (!connected && wasConnected) {
+    // Just got disconnected - clean up chat
+    chat.unsubscribe()
+    chat.messages.splice(0)
+  }
+})
+
+// Handle visibility change with proper event listener (not Vue watch!)
+// document.visibilityState is NOT reactive - Vue watch won't detect changes
+const visibilityHandler = async () => {
+  if (document.visibilityState === 'visible' && couple.isConnected && chat.todayThread) {
+    try {
+      await chat.loadMessages(chat.todayThread.id)
+      scrollToBottom()
+    } catch (e) {
+      console.error('Message reload error:', e)
+    }
+  }
+}
+document.addEventListener('visibilitychange', visibilityHandler)
 
 watch(() => chat.messages.length, () => {
   nextTick(scrollToBottom)
@@ -128,12 +159,7 @@ async function sendConnectionReq(userId) {
 async function acceptReq(requestId) {
   try {
     await couple.acceptConnectionRequest(requestId)
-    // After accepting, init chat
-    const day = await chat.ensureTodayThread()
-    if (day) {
-      await chat.loadMessages(day.id)
-      chat.subscribeToMessages(day.id)
-    }
+    // Chat init will be triggered by the isConnected watcher
   } catch (e) {
     alert('연결 수락 실패: ' + e.message)
   }

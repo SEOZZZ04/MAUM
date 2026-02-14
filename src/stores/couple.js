@@ -11,6 +11,7 @@ export const useCoupleStore = defineStore('couple', () => {
   const onlineGuests = ref([])
   const pendingRequests = ref([])
   let guestChannel = null
+  let coupleChannel = null
 
   const coupleId = computed(() => couple.value?.id)
   const isConnected = computed(() => !!couple.value)
@@ -49,6 +50,12 @@ export const useCoupleStore = defineStore('couple', () => {
           .single()
         partner.value = partnerProfile
       }
+
+      // Subscribe to couple broadcast channel for disconnect notifications
+      subscribeToCoupleChannel(membership.couple_id)
+    } else {
+      couple.value = null
+      partner.value = null
     }
     loading.value = false
   }
@@ -69,7 +76,20 @@ export const useCoupleStore = defineStore('couple', () => {
 
     const cid = coupleId.value
 
-    // Delete all couple data in order (respecting foreign keys)
+    // Broadcast disconnect to partner BEFORE deleting
+    if (coupleChannel) {
+      coupleChannel.send({
+        type: 'broadcast',
+        event: 'couple_disconnected',
+        payload: {}
+      })
+      // Small delay to ensure broadcast is sent
+      await new Promise(r => setTimeout(r, 300))
+    }
+
+    // Delete in correct order (respecting foreign keys)
+    // Tables with ON DELETE CASCADE from couples would auto-cascade,
+    // but explicit deletion ensures RLS policies are respected
     await supabase.from('graph_edges').delete().eq('couple_id', cid)
     await supabase.from('graph_nodes').delete().eq('couple_id', cid)
     await supabase.from('daily_summaries').delete().eq('couple_id', cid)
@@ -81,8 +101,31 @@ export const useCoupleStore = defineStore('couple', () => {
     await supabase.from('couple_members').delete().eq('couple_id', cid)
     await supabase.from('couples').delete().eq('id', cid)
 
+    // Cleanup local state
+    unsubscribeFromCoupleChannel()
     couple.value = null
     partner.value = null
+  }
+
+  // Subscribe to couple broadcast channel for disconnect notifications
+  function subscribeToCoupleChannel(cid) {
+    unsubscribeFromCoupleChannel()
+    coupleChannel = supabase
+      .channel(`couple:${cid}`)
+      .on('broadcast', { event: 'couple_disconnected' }, () => {
+        // Partner disconnected - reset local state
+        couple.value = null
+        partner.value = null
+        unsubscribeFromCoupleChannel()
+      })
+      .subscribe()
+  }
+
+  function unsubscribeFromCoupleChannel() {
+    if (coupleChannel) {
+      supabase.removeChannel(coupleChannel)
+      coupleChannel = null
+    }
   }
 
   // Guest connection system
@@ -120,39 +163,11 @@ export const useCoupleStore = defineStore('couple', () => {
   }
 
   async function acceptConnectionRequest(requestId) {
-    const auth = useAuthStore()
-
-    // Get the request
-    const { data: request } = await supabase
-      .from('guest_connection_requests')
-      .select('*')
-      .eq('id', requestId)
-      .single()
-
-    if (!request) throw new Error('요청을 찾을 수 없습니다')
-
-    // Create a couple
-    const { data: newCouple, error: coupleError } = await supabase
-      .from('couples')
-      .insert({})
-      .select()
-      .single()
-    if (coupleError) throw coupleError
-
-    // Add both members
-    await supabase.from('couple_members').insert([
-      { couple_id: newCouple.id, user_id: request.from_user_id },
-      { couple_id: newCouple.id, user_id: auth.userId }
-    ])
-
-    // Update request status
-    await supabase
-      .from('guest_connection_requests')
-      .update({ status: 'accepted' })
-      .eq('id', requestId)
-
-    // Refresh couple data
+    // Use edge function with admin client to bypass RLS
+    // (client-side INSERT can't add partner's couple_members row)
+    const result = await api.acceptGuestConnection(requestId)
     await fetchCouple()
+    return result
   }
 
   async function rejectConnectionRequest(requestId) {
@@ -169,7 +184,8 @@ export const useCoupleStore = defineStore('couple', () => {
     const auth = useAuthStore()
 
     guestChannel = supabase
-      .channel('guest-requests')
+      .channel('guest-updates')
+      // 1) New connection request received
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -178,6 +194,7 @@ export const useCoupleStore = defineStore('couple', () => {
       }, () => {
         fetchPendingRequests()
       })
+      // 2) My sent request was answered
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -187,6 +204,34 @@ export const useCoupleStore = defineStore('couple', () => {
         if (payload.new.status === 'accepted') {
           fetchCouple()
         }
+      })
+      // 3) Profile is_online changes - someone comes online/goes offline
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles'
+      }, (payload) => {
+        // Only care about is_online changes
+        if (payload.old?.is_online !== payload.new?.is_online) {
+          fetchOnlineGuests()
+        }
+      })
+      // 4) New profile created (new guest signed in)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'profiles'
+      }, () => {
+        fetchOnlineGuests()
+      })
+      // 5) I was added to a couple (partner accepted via invite code)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'couple_members',
+        filter: `user_id=eq.${auth.userId}`
+      }, () => {
+        fetchCouple()
       })
       .subscribe()
   }
@@ -198,12 +243,18 @@ export const useCoupleStore = defineStore('couple', () => {
     }
   }
 
+  function cleanup() {
+    unsubscribeFromGuestUpdates()
+    unsubscribeFromCoupleChannel()
+  }
+
   return {
     couple, partner, loading, onlineGuests, pendingRequests,
     coupleId, isConnected,
     fetchCouple, createInviteCode, redeemInviteCode, disconnectCouple,
     fetchOnlineGuests, sendConnectionRequest,
     fetchPendingRequests, acceptConnectionRequest, rejectConnectionRequest,
-    subscribeToGuestUpdates, unsubscribeFromGuestUpdates
+    subscribeToGuestUpdates, unsubscribeFromGuestUpdates,
+    subscribeToCoupleChannel, unsubscribeFromCoupleChannel, cleanup
   }
 })

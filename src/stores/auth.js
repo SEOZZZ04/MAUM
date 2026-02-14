@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
-import { useRouter } from 'vue-router'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -15,10 +14,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function init() {
     loading.value = true
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.user) {
-      user.value = session.user
-      await fetchProfile()
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        user.value = session.user
+        await fetchProfile()
+      }
+    } catch (e) {
+      console.error('Auth init error:', e)
     }
     loading.value = false
 
@@ -37,9 +40,13 @@ export const useAuthStore = defineStore('auth', () => {
     // Handle visibility change - refresh session when returning to tab
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState === 'visible' && user.value) {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user) {
-          user.value = session.user
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.user) {
+            user.value = session.user
+          }
+        } catch (e) {
+          console.error('Session refresh error:', e)
         }
       }
     })

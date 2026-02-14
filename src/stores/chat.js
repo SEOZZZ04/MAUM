@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useCoupleStore } from './couple'
 import { api } from '../lib/api'
@@ -53,14 +53,30 @@ export const useChatStore = defineStore('chat', () => {
         table: 'messages',
         filter: `day_id=eq.${dayId}`
       }, async (payload) => {
-        const { data } = await supabase
-          .from('profiles')
-          .select('nickname, avatar_url')
-          .eq('user_id', payload.new.sender_user_id)
-          .single()
-        messages.value.push({ ...payload.new, profiles: data })
+        // Prevent duplicate messages
+        if (messages.value.some(m => m.id === payload.new.id)) return
+
+        // Fetch sender profile
+        let profileData = null
+        try {
+          const { data } = await supabase
+            .from('profiles')
+            .select('nickname, avatar_url')
+            .eq('user_id', payload.new.sender_user_id)
+            .single()
+          profileData = data
+        } catch {
+          // Profile fetch failed (RLS or network) - still show the message
+        }
+        // Check again after async fetch to prevent race condition duplicates
+        if (messages.value.some(m => m.id === payload.new.id)) return
+        messages.value.push({ ...payload.new, profiles: profileData })
       })
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) {
+          console.error('Message subscription error:', err)
+        }
+      })
   }
 
   function unsubscribe() {

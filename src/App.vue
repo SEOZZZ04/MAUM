@@ -1,6 +1,6 @@
 <script setup>
-import { onMounted, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { useCoupleStore } from './stores/couple'
 import BottomTabs from './components/common/BottomTabs.vue'
@@ -8,16 +8,17 @@ import BottomTabs from './components/common/BottomTabs.vue'
 const auth = useAuthStore()
 const couple = useCoupleStore()
 const route = useRoute()
-const router = useRouter()
 
 onMounted(async () => {
   await auth.init()
   if (auth.isLoggedIn) {
     await couple.fetchCouple()
+    // Subscribe to real-time updates for all logged-in users
+    // (handles: online guests, connection requests, couple linking, invite code redemption)
+    couple.subscribeToGuestUpdates()
     // Set guest online status
     if (auth.isGuest) {
       await auth.setGuestOnline()
-      couple.subscribeToGuestUpdates()
     }
   }
 })
@@ -25,17 +26,34 @@ onMounted(async () => {
 onUnmounted(() => {
   if (auth.isGuest) {
     auth.setGuestOffline()
-    couple.unsubscribeFromGuestUpdates()
   }
+  couple.cleanup()
 })
 
 // Handle beforeunload to set offline
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     if (auth.isGuest && auth.userId) {
-      // Use sendBeacon for reliable offline status
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?user_id=eq.${auth.userId}`
-      navigator.sendBeacon(url) // Best-effort
+      // Use sendBeacon to set offline status reliably on page close
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+      const url = `${supabaseUrl}/rest/v1/profiles?user_id=eq.${auth.userId}`
+      const body = JSON.stringify({ is_online: false })
+      const headers = {
+        type: 'application/json'
+      }
+      // sendBeacon with proper PATCH request via fetch keepalive
+      fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Prefer': 'return=minimal'
+        },
+        body,
+        keepalive: true
+      }).catch(() => {})
     }
   })
 }
