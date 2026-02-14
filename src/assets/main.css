@@ -1,16 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #f59e0b;
-  --color-primary-dark: #d97706;
-  --color-primary-light: #fbbf24;
-  --color-accent: #fb923c;
-  --color-bg: #fffbf0;
+  --color-primary: #f472b6;
+  --color-primary-dark: #ec4899;
+  --color-primary-light: #fbcfe8;
+  --color-accent: #7dd3fc;
+  --color-accent-dark: #38bdf8;
+  --color-accent-light: #bae6fd;
+  --color-lavender: #c4b5fd;
+  --color-bg: #fff5f7;
+  --color-bg-blue: #eff6ff;
   --color-card: #ffffff;
-  --color-card-border: #fde68a;
-  --color-text-primary: #78350f;
-  --color-text-secondary: #92400e;
-  --color-text-muted: #b45309;
+  --color-card-border: #fce7f3;
+  --color-text-primary: #831843;
+  --color-text-secondary: #9d174d;
+  --color-text-muted: #be185d;
 }
 
 html, body, #app {
@@ -20,7 +24,7 @@ html, body, #app {
   overflow: hidden;
 }
 
-/* Custom scrollbar - light theme */
+/* Custom scrollbar - pink theme */
 ::-webkit-scrollbar {
   width: 4px;
 }
@@ -28,7 +32,7 @@ html, body, #app {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #fbbf24;
+  background: #f9a8d4;
   border-radius: 2px;
 }
 
@@ -50,9 +54,9 @@ html, body, #app {
   filter: brightness(1.1);
 }
 
-/* Cute cloud-like soft shadows */
+/* Cute cloud-like soft shadows with pink tint */
 .card-cute {
-  box-shadow: 0 2px 15px rgba(251, 191, 36, 0.15), 0 1px 4px rgba(251, 191, 36, 0.1);
+  box-shadow: 0 2px 15px rgba(244, 114, 182, 0.12), 0 1px 4px rgba(244, 114, 182, 0.08);
 }
 
 /* Pulse glow for online indicator */
@@ -62,4 +66,68 @@ html, body, #app {
 }
 .pulse-online {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Floating hearts animation */
+@keyframes float-heart {
+  0% { transform: translateY(0) scale(1); opacity: 0.7; }
+  50% { transform: translateY(-8px) scale(1.05); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 0.7; }
+}
+.float-heart {
+  animation: float-heart 3s ease-in-out infinite;
+}
+.float-heart-delay {
+  animation: float-heart 3s ease-in-out 1s infinite;
+}
+.float-heart-delay-2 {
+  animation: float-heart 3s ease-in-out 2s infinite;
+}
+
+/* Gentle bounce */
+.gentle-bounce {
+  animation: float-heart 2.5s ease-in-out infinite;
+}
+
+/* Gradient text for MAUM branding */
+.text-gradient-pink {
+  background: linear-gradient(135deg, #ec4899, #f472b6, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Decorative heart background radials */
+.heart-bg {
+  position: relative;
+}
+.heart-bg::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(244, 114, 182, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(125, 211, 252, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(196, 181, 253, 0.04) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Send button gradient */
+.btn-send {
+  background: linear-gradient(135deg, #f472b6, #ec4899);
+  transition: all 0.2s;
+}
+.btn-send:hover {
+  background: linear-gradient(135deg, #ec4899, #db2777);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+}
+.btn-send:disabled {
+  background: #fce7f3;
+  transform: none;
+  box-shadow: none;
 }

@@ -42,33 +42,33 @@ function formatDate(d) {
 <template>
   <div class="h-full flex flex-col">
     <div class="flex items-center gap-2 px-4 pt-4 pb-2">
-      <button @click="router.back()" class="text-amber-400 hover:text-amber-600">
+      <button @click="router.back()" class="text-pink-400 hover:text-pink-600">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
       </button>
-      <h1 class="text-xl font-bold text-amber-900">아카이브</h1>
+      <h1 class="text-xl font-bold text-rose-900">아카이브</h1>
     </div>
 
     <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
       <LoadingSpinner v-if="loading" />
-      <div v-else-if="days.length === 0" class="text-center text-amber-400 py-12">
-        <div class="text-3xl mb-2">🌰</div>
+      <div v-else-if="days.length === 0" class="text-center text-pink-300 py-12">
+        <div class="text-2xl mb-2">&#x2764;</div>
         아카이브가 비어있습니다
       </div>
       <CardWrapper v-for="day in days" :key="day.id"
         class="cursor-pointer hover:shadow-lg transition-shadow" @click="router.push(`/archive/${day.id}`)">
         <div class="flex justify-between items-start">
           <div>
-            <p class="text-xs text-amber-500">{{ formatDate(day.date) }}</p>
-            <h3 class="font-bold text-amber-900 mt-1">{{ day.title_override || day.title || day.date }}</h3>
+            <p class="text-xs text-pink-400">{{ formatDate(day.date) }}</p>
+            <h3 class="font-bold text-rose-900 mt-1">{{ day.title_override || day.title || day.date }}</h3>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-xs bg-amber-100 text-amber-500 px-2 py-0.5 rounded-full">archived</span>
-            <button @click.stop="editTitle(day)" class="text-xs text-amber-400 hover:text-amber-600">수정</button>
+            <span class="text-xs bg-pink-50 text-pink-400 px-2 py-0.5 rounded-full border border-pink-200">archived</span>
+            <button @click.stop="editTitle(day)" class="text-xs text-pink-400 hover:text-pink-600">수정</button>
           </div>
         </div>
-        <p class="text-xs text-amber-500/70 mt-2">
+        <p class="text-xs text-pink-400/70 mt-2">
           {{ day.messages?.[0]?.count || 0 }}개 메시지
         </p>
       </CardWrapper>
