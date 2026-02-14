@@ -1,10 +1,7 @@
 import { supabase } from './supabase'
 
 async function callEdgeFunction(name, body = {}) {
-  const { data, error } = await supabase.functions.invoke(name, {
-    body: JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json' }
-  })
+  const { data, error } = await supabase.functions.invoke(name, { body })
   if (error) throw error
   return data
 }
