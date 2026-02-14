@@ -9,23 +9,85 @@ export const useChatStore = defineStore('chat', () => {
   const todayThread = ref(null)
   const loading = ref(false)
   const extractingGraph = ref(false)
+  const initError = ref(null)
   let realtimeChannel = null
   let _subscribedDayId = null
-  // Track messages since last graph extraction
-  let _messagesSinceExtraction = 0
+  // Track messages since last graph extraction (persisted in sessionStorage)
+  let _messagesSinceExtraction = parseInt(sessionStorage.getItem('maum_msg_count') || '0', 10)
   const EXTRACT_EVERY_N_MESSAGES = 5
   // Prevent concurrent initialization
   let _initPromise = null
 
+  // Persist message counter across soft navigations
+  function _persistMsgCount() {
+    sessionStorage.setItem('maum_msg_count', String(_messagesSinceExtraction))
+  }
+
   async function ensureTodayThread() {
-    const data = await api.ensureTodayThread()
-    // Handle both RPC (returns {day: {...}}) and direct responses
-    const day = data?.day || data
-    if (day?.id) {
-      todayThread.value = day
-      return day
+    // 1) Try RPC/Edge Function first
+    try {
+      const data = await api.ensureTodayThread()
+      const day = data?.day || data
+      if (day?.id) {
+        todayThread.value = day
+        return day
+      }
+    } catch (e) {
+      console.warn('ensureTodayThread RPC/Edge failed, trying direct query:', e.message)
     }
-    throw new Error('오늘의 대화방을 생성할 수 없습니다')
+
+    // 2) Fallback: query conversation_days directly
+    const couple = useCoupleStore()
+    if (!couple.coupleId) throw new Error('커플이 연동되지 않았습니다')
+
+    const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
+    const todayStr = today.toISOString().split('T')[0]
+
+    // Try to find existing non-archived day for today
+    const { data: existingDay, error: findError } = await supabase
+      .from('conversation_days')
+      .select('*')
+      .eq('couple_id', couple.coupleId)
+      .eq('date', todayStr)
+      .eq('archived', false)
+      .maybeSingle()
+
+    if (existingDay) {
+      todayThread.value = existingDay
+      return existingDay
+    }
+
+    // If no day exists, find the most recent non-archived day (could be yesterday if not yet archived)
+    const { data: recentDay } = await supabase
+      .from('conversation_days')
+      .select('*')
+      .eq('couple_id', couple.coupleId)
+      .eq('archived', false)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (recentDay) {
+      todayThread.value = recentDay
+      return recentDay
+    }
+
+    // Last resort: create a new day directly
+    const { data: newDay, error: insertError } = await supabase
+      .from('conversation_days')
+      .insert({
+        couple_id: couple.coupleId,
+        date: todayStr,
+        title: todayStr,
+        archived: false
+      })
+      .select()
+      .single()
+
+    if (insertError) throw new Error('대화방을 생성할 수 없습니다: ' + insertError.message)
+
+    todayThread.value = newDay
+    return newDay
   }
 
   async function loadMessages(dayId) {
@@ -41,6 +103,8 @@ export const useChatStore = defineStore('chat', () => {
       // Only replace messages if query succeeded - prevents data loss on stale connections
       if (!error && data) {
         messages.value = data
+      } else if (error) {
+        console.error('Failed to load messages:', error)
       }
     } catch (e) {
       console.error('Failed to load messages:', e)
@@ -66,6 +130,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // Track message count for graph extraction
     _messagesSinceExtraction++
+    _persistMsgCount()
     if (_messagesSinceExtraction >= EXTRACT_EVERY_N_MESSAGES) {
       triggerGraphExtraction()
     }
@@ -78,6 +143,7 @@ export const useChatStore = defineStore('chat', () => {
 
     extractingGraph.value = true
     _messagesSinceExtraction = 0
+    _persistMsgCount()
 
     try {
       // Gather last N messages as context for extraction
@@ -135,6 +201,7 @@ export const useChatStore = defineStore('chat', () => {
 
         // Track incoming messages for graph extraction too
         _messagesSinceExtraction++
+        _persistMsgCount()
         if (_messagesSinceExtraction >= EXTRACT_EVERY_N_MESSAGES) {
           triggerGraphExtraction()
         }
@@ -167,6 +234,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function _doInitChat() {
+    initError.value = null
     try {
       const day = await ensureTodayThread()
       if (day) {
@@ -176,27 +244,53 @@ export const useChatStore = defineStore('chat', () => {
       }
     } catch (e) {
       console.error('Chat init error:', e)
+      initError.value = e.message || '채팅 초기화 실패'
+
+      // If ensureTodayThread failed but we have messages from before, keep them
+      // Try to at least load messages from any existing thread
+      const couple = useCoupleStore()
+      if (couple.coupleId && !todayThread.value) {
+        try {
+          const { data: latestDay } = await supabase
+            .from('conversation_days')
+            .select('*')
+            .eq('couple_id', couple.coupleId)
+            .eq('archived', false)
+            .order('date', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (latestDay) {
+            todayThread.value = latestDay
+            await loadMessages(latestDay.id)
+            subscribeToMessages(latestDay.id)
+            initError.value = null
+            return latestDay
+          }
+        } catch (fallbackErr) {
+          console.error('Fallback thread load also failed:', fallbackErr)
+        }
+      }
     }
     return null
   }
 
   // Reconnect realtime after tab becomes visible again
   async function reconnect() {
-    if (!todayThread.value) {
-      // No thread yet - do full init
-      return await initChat()
-    }
-
     // Refresh auth session first
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        // Try to refresh
         const { data } = await supabase.auth.refreshSession()
         if (!data.session) return
       }
     } catch {
       return
+    }
+
+    if (!todayThread.value) {
+      // No thread yet - do full init
+      return await initChat()
     }
 
     const dayId = todayThread.value.id
@@ -221,7 +315,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   return {
-    messages, todayThread, loading, extractingGraph,
+    messages, todayThread, loading, extractingGraph, initError,
     ensureTodayThread, loadMessages, sendMessage,
     subscribeToMessages, unsubscribe, reconnect,
     archiveToday, triggerGraphExtraction, initChat

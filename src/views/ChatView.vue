@@ -37,13 +37,15 @@ async function doInitChat() {
 }
 
 onMounted(async () => {
-  if (!couple.isConnected) {
-    if (auth.isGuest) {
-      await loadGuestLobby()
-    }
+  // If already connected, init immediately
+  if (couple.isConnected) {
+    await doInitChat()
     return
   }
-  await doInitChat()
+  // If not connected yet, load guest lobby for guests
+  if (auth.isGuest) {
+    await loadGuestLobby()
+  }
 })
 
 onUnmounted(() => {
@@ -54,10 +56,11 @@ onUnmounted(() => {
   }
 })
 
-// Watch for couple connection change (e.g., partner accepted request while on this page)
+// Watch for couple connection change - use immediate to catch already-connected state
+// This handles the case where couple data loads AFTER ChatView mounts
 watch(() => couple.isConnected, async (connected, wasConnected) => {
   if (connected && !wasConnected) {
-    // Just got connected - initialize chat
+    // Just got connected (or was already connected when watch first runs)
     await doInitChat()
   } else if (!connected && wasConnected) {
     // Just got disconnected - clean up chat
@@ -337,6 +340,15 @@ async function refreshLobby() {
         </div>
         <div v-if="analysisLoading" class="text-purple-400 text-sm animate-pulse">분석 중...</div>
         <div v-else-if="analysisResult" class="text-sm text-rose-800 whitespace-pre-wrap">{{ analysisResult.answer }}</div>
+      </div>
+
+      <!-- Init Error -->
+      <div v-if="chat.initError" class="mx-4 mb-2 bg-red-50/80 border border-red-200 rounded-2xl p-4 text-center">
+        <p class="text-red-500 text-sm mb-2">{{ chat.initError }}</p>
+        <button @click="doInitChat"
+          class="bg-red-400 hover:bg-red-500 text-white text-xs px-4 py-2 rounded-lg transition-colors font-medium">
+          다시 시도
+        </button>
       </div>
 
       <!-- Messages -->
