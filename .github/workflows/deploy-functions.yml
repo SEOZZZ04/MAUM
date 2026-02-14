@@ -1,16 +1,13 @@
 name: Deploy Edge Functions
 
 on:
-  # 1. 수동으로 버튼 눌러서 실행할 수 있게 해주는 치트키
-  workflow_dispatch: 
-  
-  # 2. 코드가 푸시될 때도 실행 (브랜치 이름 꼭 확인!)
+  workflow_dispatch: # 수동 실행 버튼
   push:
     branches:
-      - 'claude/greenfield-app-rebuild-DO8mX'  # 사용 중인 정확한 브랜치명 입력
-      - main  # 혹시 몰라 main도 남겨둠
+      - 'claude/greenfield-app-rebuild-DO8mX' # 사용하시는 브랜치명
+      - main
     paths:
-      - 'supabase/functions/**' 
+      - 'supabase/functions/**'
 
 jobs:
   deploy:
@@ -26,6 +23,5 @@ jobs:
           version: latest
 
       - name: Deploy all functions
-        # --no-verify-jwt 옵션 추가 (가끔 권한 문제 생길 때 유용)
         run: |
-          supabase functions deploy --project-ref $SUPABASE_PROJECT_ID --force --no-verify-jwt
+          supabase functions deploy --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
