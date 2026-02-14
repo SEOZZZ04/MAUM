@@ -21,16 +21,14 @@ jwt_expiry = 3600
 enable_signup = true
 
 [auth.external.google]
-enabled = true
-client_id = ""
-secret = ""
-redirect_uri = ""
+enabled = false
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
 
 [auth.external.kakao]
-enabled = true
-client_id = ""
-secret = ""
-redirect_uri = ""
+enabled = false
+client_id = "env(KAKAO_CLIENT_ID)"
+secret = "env(KAKAO_CLIENT_SECRET)"
 
 [storage]
 enabled = true
