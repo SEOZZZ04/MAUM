@@ -21,8 +21,6 @@ jwt_expiry = 3600
 enable_signup = true
 # Enable anonymous sign-ins for guest users (no email/password needed)
 enable_anonymous_sign_ins = true
-# Disable email confirmation to avoid rate limiting issues
-enable_confirmations = false
 
 [auth.external.google]
 enabled = false
