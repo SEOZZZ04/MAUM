@@ -66,59 +66,56 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function signInAsGuest() {
-    // Generate or retrieve device-based guest credentials
-    let guestId = localStorage.getItem('maum_guest_id')
-    let guestPassword = localStorage.getItem('maum_guest_password')
+    // Clean up old email/password based credentials (no longer needed)
+    localStorage.removeItem('maum_guest_id')
+    localStorage.removeItem('maum_guest_password')
 
-    // Clear invalid cached credentials from old format (@maum.guest)
-    if (guestId && guestId.endsWith('@maum.guest')) {
-      localStorage.removeItem('maum_guest_id')
-      localStorage.removeItem('maum_guest_password')
-      guestId = null
-      guestPassword = null
-    }
-
-    if (!guestId || !guestPassword) {
-      // Generate a unique device-based ID
-      const deviceFingerprint = generateDeviceFingerprint()
-      guestId = `guest_${deviceFingerprint}@guest.maumapp.com`
-      guestPassword = `guest_pw_${deviceFingerprint}_${Date.now()}`
-      localStorage.setItem('maum_guest_id', guestId)
-      localStorage.setItem('maum_guest_password', guestPassword)
-    }
-
-    // Try to sign in first
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: guestId,
-      password: guestPassword
+    // Use Supabase Anonymous Sign-In (no email/password needed)
+    // This method:
+    // - Has no rate limiting issues
+    // - Automatically manages sessions in localStorage
+    // - Creates a unique anonymous user per device
+    // - Can be converted to a real account later if needed
+    const { data, error } = await supabase.auth.signInAnonymously({
+      options: {
+        data: {
+          is_guest: true,
+          device_fingerprint: generateDeviceFingerprint()
+        }
+      }
     })
 
-    if (signInError) {
-      // If login fails, sign up
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: guestId,
-        password: guestPassword,
-        options: {
-          data: {
-            is_guest: true,
-            full_name: `Guest_${guestId.split('_')[1]?.substring(0, 6) || 'User'}`,
-          }
-        }
-      })
-      if (signUpError) throw signUpError
-      user.value = signUpData.user
+    if (error) throw error
 
-      // Update profile nickname for guest
-      if (signUpData.user) {
-        const guestNick = `Guest_${guestId.split('_')[1]?.substring(0, 6) || 'User'}`
+    user.value = data.user
+
+    // Create/update profile for guest user
+    if (data.user) {
+      const guestNick = `Guest_${data.user.id.substring(0, 6)}`
+
+      // Check if profile exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('user_id', data.user.id)
+        .single()
+
+      if (!existingProfile) {
+        // Create new profile
+        await supabase
+          .from('profiles')
+          .insert({
+            user_id: data.user.id,
+            nickname: guestNick
+          })
+      } else {
+        // Update existing profile
         await supabase
           .from('profiles')
           .update({ nickname: guestNick })
-          .eq('user_id', signUpData.user.id)
-        await fetchProfile()
+          .eq('user_id', data.user.id)
       }
-    } else {
-      user.value = signInData.user
+
       await fetchProfile()
     }
   }
