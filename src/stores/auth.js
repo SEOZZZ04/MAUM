@@ -70,10 +70,18 @@ export const useAuthStore = defineStore('auth', () => {
     let guestId = localStorage.getItem('maum_guest_id')
     let guestPassword = localStorage.getItem('maum_guest_password')
 
+    // Clear invalid cached credentials from old format (@maum.guest)
+    if (guestId && guestId.endsWith('@maum.guest')) {
+      localStorage.removeItem('maum_guest_id')
+      localStorage.removeItem('maum_guest_password')
+      guestId = null
+      guestPassword = null
+    }
+
     if (!guestId || !guestPassword) {
       // Generate a unique device-based ID
       const deviceFingerprint = generateDeviceFingerprint()
-      guestId = `guest_${deviceFingerprint}@maum.guest`
+      guestId = `guest_${deviceFingerprint}@guest.maumapp.com`
       guestPassword = `guest_pw_${deviceFingerprint}_${Date.now()}`
       localStorage.setItem('maum_guest_id', guestId)
       localStorage.setItem('maum_guest_password', guestPassword)
