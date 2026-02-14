@@ -1,11 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --color-pink-primary: #ec4899;
-  --color-pink-dark: #be185d;
-  --color-slate-bg: #0f172a;
-  --color-slate-card: #1e293b;
-  --color-slate-border: #334155;
+  --color-primary: #f59e0b;
+  --color-primary-dark: #d97706;
+  --color-primary-light: #fbbf24;
+  --color-accent: #fb923c;
+  --color-bg: #fffbf0;
+  --color-card: #ffffff;
+  --color-card-border: #fde68a;
+  --color-text-primary: #78350f;
+  --color-text-secondary: #92400e;
+  --color-text-muted: #b45309;
 }
 
 html, body, #app {
@@ -15,7 +20,7 @@ html, body, #app {
   overflow: hidden;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - light theme */
 ::-webkit-scrollbar {
   width: 4px;
 }
@@ -23,7 +28,7 @@ html, body, #app {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #fbbf24;
   border-radius: 2px;
 }
 
@@ -42,5 +47,19 @@ html, body, #app {
   transition: r 0.2s;
 }
 .graph-node:hover {
-  filter: brightness(1.3);
+  filter: brightness(1.1);
+}
+
+/* Cute cloud-like soft shadows */
+.card-cute {
+  box-shadow: 0 2px 15px rgba(251, 191, 36, 0.15), 0 1px 4px rgba(251, 191, 36, 0.1);
+}
+
+/* Pulse glow for online indicator */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+}
+.pulse-online {
+  animation: pulse-glow 2s ease-in-out infinite;
 }

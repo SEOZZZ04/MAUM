@@ -2,7 +2,21 @@ import { supabase } from './supabase'
 
 async function callEdgeFunction(name, body = {}) {
   const { data, error } = await supabase.functions.invoke(name, { body })
-  if (error) throw error
+  if (error) {
+    // Try to extract the actual error message from the response
+    if (error.context?.body) {
+      try {
+        const text = await error.context.body.text?.() || error.context.body
+        const parsed = JSON.parse(typeof text === 'string' ? text : JSON.stringify(text))
+        if (parsed.error) throw new Error(parsed.error)
+      } catch (parseErr) {
+        if (parseErr.message && parseErr.message !== 'Unexpected token') throw parseErr
+      }
+    }
+    throw new Error(error.message || 'Edge Function 호출 실패')
+  }
+  // Handle case where data contains an error
+  if (data?.error) throw new Error(data.error)
   return data
 }
 
