@@ -10,6 +10,80 @@ interface GraphExtraction {
 
 const HUB_NODE = { label: '커플 대화 허브', type: 'topic' } as const
 
+const CANONICAL_RELATIONS = [
+  'causes',
+  'relates_to',
+  'triggers',
+  'resolves',
+  'prefers',
+  'avoids',
+  'conflicts_with',
+  'supports',
+  'mentions',
+  'feels',
+  'planned_for',
+  'visits',
+  'participates_in',
+  'part_of',
+] as const
+
+const RELATION_MAP: Record<string, typeof CANONICAL_RELATIONS[number]> = {
+  '원인됨': 'causes',
+  '관련됨': 'relates_to',
+  '유발함': 'triggers',
+  '해결함': 'resolves',
+  '선호함': 'prefers',
+  '회피함': 'avoids',
+  '갈등됨': 'conflicts_with',
+  '지지함': 'supports',
+  '언급함': 'mentions',
+  '느낌': 'feels',
+  '계획함': 'planned_for',
+  '방문함': 'visits',
+  '참여함': 'participates_in',
+  '부분임': 'part_of',
+
+  causes: 'causes',
+  cause: 'causes',
+  relates_to: 'relates_to',
+  related_to: 'relates_to',
+  relates: 'relates_to',
+  triggers: 'triggers',
+  trigger: 'triggers',
+  resolves: 'resolves',
+  resolve: 'resolves',
+  prefers: 'prefers',
+  prefer: 'prefers',
+  avoids: 'avoids',
+  avoid: 'avoids',
+  conflicts_with: 'conflicts_with',
+  conflict_with: 'conflicts_with',
+  supports: 'supports',
+  support: 'supports',
+  mentions: 'mentions',
+  mention: 'mentions',
+  feels: 'feels',
+  feel: 'feels',
+  planned_for: 'planned_for',
+  plans_for: 'planned_for',
+  plan_for: 'planned_for',
+  planned: 'planned_for',
+  visits: 'visits',
+  visit: 'visits',
+  participates_in: 'participates_in',
+  participate_in: 'participates_in',
+  participates: 'participates_in',
+  part_of: 'part_of',
+  partof: 'part_of',
+}
+
+function normalizeRelation(relation: string): typeof CANONICAL_RELATIONS[number] {
+  const raw = (relation || '').trim()
+  const normalizedKey = raw.toLowerCase().replace(/[\s-]+/g, '_')
+
+  return RELATION_MAP[raw] || RELATION_MAP[normalizedKey] || 'relates_to'
+}
+
 const normalizeNodeLabel = (label: string) => label.trim().replace(/\s+/g, ' ')
 const normalizeNodeType = (type: string) => type.trim().toLowerCase()
 const nodeKey = (label: string, type: string) => `${normalizeNodeLabel(label)}:${normalizeNodeType(type)}`
@@ -184,7 +258,7 @@ ${existingNodesBlock}${contextBlock}
       source_type: normalizeNodeType(edge.source_type),
       target: normalizeNodeLabel(edge.target),
       target_type: normalizeNodeType(edge.target_type),
-      relation: edge.relation.trim(),
+      relation: normalizeRelation(edge.relation),
     }))
 
     let edgeInsertFailedCount = 0
@@ -282,7 +356,7 @@ ${existingNodesBlock}${contextBlock}
 
         let isConnected = false
         if (hubId && hubId !== nodeId) {
-          isConnected = await upsertEdge(nodeId, hubId, '관련됨')
+          isConnected = await upsertEdge(nodeId, hubId, normalizeRelation('관련됨'))
           if (isConnected) {
             orphanPreventedCount++
             edgesCreated++
