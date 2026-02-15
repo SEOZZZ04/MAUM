@@ -12,12 +12,11 @@ const emit = defineEmits(['node-click'])
 
 const container = ref(null)
 let svg, simulation, zoomBehavior, gGroup
-// Keep references for search-zoom
 let nodeElements, labelElements, linkElements, linkLabelElements
 let nodeDataMap = new Map()
 
 const typeColors = {
-  person: '#ec4899',
+  person: '#c9a96e',
   topic: '#a78bfa',
   event: '#fb923c',
   emotion: '#f87171',
@@ -43,13 +42,11 @@ function buildGraph() {
 
   gGroup = svg.append('g')
 
-  // Zoom
   zoomBehavior = d3.zoom()
     .scaleExtent([0.3, 5])
     .on('zoom', (event) => gGroup.attr('transform', event.transform))
   svg.call(zoomBehavior)
 
-  // Prepare data
   const nodeMap = new Map(props.nodes.map(n => [n.id, { ...n }]))
   nodeDataMap = nodeMap
   const links = props.edges
@@ -61,19 +58,18 @@ function buildGraph() {
     }))
   const nodeData = Array.from(nodeMap.values())
 
-  // Simulation
   simulation = d3.forceSimulation(nodeData)
     .force('link', d3.forceLink(links).id(d => d.id).distance(80))
     .force('charge', d3.forceManyBody().strength(-200))
     .force('center', d3.forceCenter(width / 2, height / 2))
     .force('collision', d3.forceCollide().radius(30))
 
-  // Edges
+  // Edges - warm beige tone
   linkElements = gGroup.append('g')
     .selectAll('line')
     .data(links)
     .join('line')
-    .attr('stroke', '#f9a8d4')
+    .attr('stroke', '#d4bfa0')
     .attr('stroke-width', d => Math.min(d.weight, 5))
     .attr('stroke-opacity', 0.4)
 
@@ -84,7 +80,7 @@ function buildGraph() {
     .join('text')
     .text(d => d.relation)
     .attr('font-size', '8px')
-    .attr('fill', '#b5678e')
+    .attr('fill', '#8a7560')
     .attr('text-anchor', 'middle')
     .attr('opacity', 0.7)
 
@@ -95,7 +91,7 @@ function buildGraph() {
     .join('circle')
     .attr('r', d => Math.min(8 + d.weight * 2, 25))
     .attr('fill', d => typeColors[d.type] || '#888')
-    .attr('stroke', '#ffffff')
+    .attr('stroke', '#fffcf7')
     .attr('stroke-width', 2)
     .attr('cursor', 'pointer')
     .attr('filter', 'none')
@@ -119,7 +115,7 @@ function buildGraph() {
     .join('text')
     .text(d => d.label)
     .attr('font-size', '11px')
-    .attr('fill', '#6b3a5c')
+    .attr('fill', '#5d4e37')
     .attr('dx', 12)
     .attr('dy', 4)
     .attr('pointer-events', 'none')
@@ -147,15 +143,13 @@ function highlightSearch() {
   const q = props.searchQuery?.toLowerCase()
 
   if (!q) {
-    // Reset all to full opacity
-    nodeElements.attr('opacity', 1).attr('stroke-width', 2).attr('stroke', '#ffffff')
+    nodeElements.attr('opacity', 1).attr('stroke-width', 2).attr('stroke', '#fffcf7')
     labelElements.attr('opacity', 1).attr('font-weight', 'normal')
     linkElements.attr('stroke-opacity', 0.4)
     linkLabelElements.attr('opacity', 0.7)
     return
   }
 
-  // Find matching node IDs
   const matchingIds = new Set()
   nodeElements.each(function(d) {
     if (d.label.toLowerCase().includes(q) || d.type.toLowerCase().includes(q)) {
@@ -163,7 +157,6 @@ function highlightSearch() {
     }
   })
 
-  // Find related node IDs (connected via edges)
   const relatedIds = new Set()
   linkElements.each(function(d) {
     const srcId = typeof d.source === 'object' ? d.source.id : d.source
@@ -172,7 +165,6 @@ function highlightSearch() {
     if (matchingIds.has(tgtId)) relatedIds.add(srcId)
   })
 
-  // Highlight matching nodes with glow, related with softer highlight, dim others
   nodeElements
     .attr('opacity', d => {
       if (matchingIds.has(d.id)) return 1
@@ -180,7 +172,7 @@ function highlightSearch() {
       return 0.15
     })
     .attr('stroke-width', d => matchingIds.has(d.id) ? 4 : 2)
-    .attr('stroke', d => matchingIds.has(d.id) ? '#fbbf24' : (relatedIds.has(d.id) ? '#fde68a' : '#ffffff'))
+    .attr('stroke', d => matchingIds.has(d.id) ? '#c9a96e' : (relatedIds.has(d.id) ? '#ecdcc5' : '#fffcf7'))
 
   labelElements
     .attr('opacity', d => {
@@ -191,7 +183,6 @@ function highlightSearch() {
     })
     .attr('font-weight', d => matchingIds.has(d.id) ? 'bold' : 'normal')
 
-  // Highlight connected edges
   linkElements
     .attr('stroke-opacity', d => {
       const srcId = typeof d.source === 'object' ? d.source.id : d.source
@@ -202,8 +193,8 @@ function highlightSearch() {
     .attr('stroke', d => {
       const srcId = typeof d.source === 'object' ? d.source.id : d.source
       const tgtId = typeof d.target === 'object' ? d.target.id : d.target
-      if (matchingIds.has(srcId) || matchingIds.has(tgtId)) return '#f472b6'
-      return '#f9a8d4'
+      if (matchingIds.has(srcId) || matchingIds.has(tgtId)) return '#b08d4f'
+      return '#d4bfa0'
     })
 
   linkLabelElements
@@ -215,7 +206,6 @@ function highlightSearch() {
     })
 }
 
-// Zoom to matching nodes with smooth animation
 function zoomToSearch(query) {
   if (!svg || !nodeElements || !query) return
 
@@ -234,7 +224,6 @@ function zoomToSearch(query) {
   const width = el.clientWidth
   const height = el.clientHeight
 
-  // Calculate bounding box of all matching nodes
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   matchingNodes.forEach(n => {
     if (n.x < minX) minX = n.x
@@ -243,11 +232,9 @@ function zoomToSearch(query) {
     if (n.y > maxY) maxY = n.y
   })
 
-  // Add padding
   const padding = 80
   minX -= padding; maxX += padding; minY -= padding; maxY += padding
 
-  // Calculate zoom transform to fit all matching nodes
   const dx = maxX - minX
   const dy = maxY - minY
   const cx = (minX + maxX) / 2
@@ -259,14 +246,12 @@ function zoomToSearch(query) {
     .scale(scale)
     .translate(-cx, -cy)
 
-  // Smooth animated transition
   svg.transition()
     .duration(750)
     .ease(d3.easeCubicInOut)
     .call(zoomBehavior.transform, transform)
 }
 
-// Expose zoomToSearch for parent component to call
 defineExpose({ zoomToSearch })
 
 watch(() => [props.nodes, props.edges], () => {

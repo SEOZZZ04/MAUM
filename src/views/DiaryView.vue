@@ -18,6 +18,15 @@ const generating = ref(false)
 const uploadingAudio = ref(false)
 const uploadProgress = ref('')
 
+// Edit state
+const editingId = ref(null)
+const editTitle = ref('')
+const editContent = ref('')
+const savingEdit = ref(false)
+
+// Delete state
+const deletingId = ref(null)
+
 onMounted(async () => {
   if (couple.isConnected) {
     await Promise.all([diary.fetchSummaries(), diary.fetchCallLogs()])
@@ -27,7 +36,6 @@ onMounted(async () => {
 async function generateToday() {
   generating.value = true
   try {
-    // Use KST date
     const kstNow = new Date(new Date().getTime() + 9 * 60 * 60 * 1000)
     const today = kstNow.toISOString().split('T')[0]
     await diary.generateSummary(today)
@@ -68,11 +76,39 @@ async function uploadCallAudio(event) {
   uploadingAudio.value = false
 }
 
-function editTitle(summary) {
-  const newTitle = prompt('제목을 입력하세요:', summary.title_override || summary.title || '')
-  if (newTitle !== null) {
-    diary.updateSummaryTitle(summary.id, newTitle)
+function startEdit(summary) {
+  editingId.value = summary.id
+  editTitle.value = summary.title_override || summary.title || ''
+  editContent.value = summary.diary_text || ''
+}
+
+function cancelEdit() {
+  editingId.value = null
+  editTitle.value = ''
+  editContent.value = ''
+}
+
+async function saveEdit(summary) {
+  savingEdit.value = true
+  try {
+    await diary.updateSummaryTitle(summary.id, editTitle.value)
+    await diary.updateSummaryContent(summary.id, editContent.value)
+    editingId.value = null
+  } catch (e) {
+    alert('저장 실패: ' + e.message)
   }
+  savingEdit.value = false
+}
+
+async function confirmDelete(summary) {
+  if (!confirm(`"${summary.title_override || summary.title || summary.date}" 일기를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return
+  deletingId.value = summary.id
+  try {
+    await diary.deleteSummary(summary.id)
+  } catch (e) {
+    alert('삭제 실패: ' + e.message)
+  }
+  deletingId.value = null
 }
 
 function formatDate(d) {
@@ -84,7 +120,7 @@ function formatDate(d) {
   <div class="h-full flex flex-col">
     <PageHeader title="일기 & 통화" subtitle="대화의 기록을 돌아봅니다" />
 
-    <div v-if="!couple.isConnected" class="flex-1 flex items-center justify-center text-pink-400">
+    <div v-if="!couple.isConnected" class="flex-1 flex items-center justify-center text-[#b5a48e]">
       커플 연동 후 이용 가능합니다
     </div>
 
@@ -93,12 +129,12 @@ function formatDate(d) {
       <div class="px-4 flex gap-2 mb-3">
         <button @click="activeTab = 'diary'"
           class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          :class="activeTab === 'diary' ? 'bg-pink-400 text-white shadow-sm shadow-pink-200' : 'bg-white text-pink-500 border border-pink-200'">
+          :class="activeTab === 'diary' ? 'bg-[#c9a96e] text-white shadow-sm shadow-[#c9a96e]/20' : 'bg-[#fffcf7] text-[#c9a96e] border border-[#ecdcc5]'">
           일기
         </button>
         <button @click="activeTab = 'calls'"
           class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          :class="activeTab === 'calls' ? 'bg-sky-400 text-white shadow-sm shadow-sky-200' : 'bg-white text-sky-500 border border-sky-200'">
+          :class="activeTab === 'calls' ? 'bg-[#d4a574] text-white shadow-sm shadow-[#d4a574]/20' : 'bg-[#fffcf7] text-[#d4a574] border border-[#ecdcc5]'">
           통화 기록
         </button>
       </div>
@@ -106,53 +142,88 @@ function formatDate(d) {
       <!-- Diary Tab -->
       <div v-if="activeTab === 'diary'" class="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
         <button @click="generateToday" :disabled="generating"
-          class="w-full bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-500 hover:to-rose-500 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 shadow-md shadow-pink-200">
+          class="w-full bg-gradient-to-r from-[#c9a96e] to-[#d4a574] hover:from-[#b08d4f] hover:to-[#c08a56] text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 shadow-md shadow-[#c9a96e]/20">
           {{ generating ? '생성 중...' : '오늘 일기 만들기' }}
         </button>
 
         <LoadingSpinner v-if="diary.loading" />
-        <div v-else-if="diary.summaries.length === 0" class="text-center text-pink-300 py-12">
+        <div v-else-if="diary.summaries.length === 0" class="text-center text-[#d4bfa0] py-12">
           <div class="text-2xl mb-2">&#x2764;</div>
           아직 일기가 없습니다
         </div>
 
         <CardWrapper v-for="s in diary.summaries" :key="s.id">
-          <div class="flex justify-between items-start mb-2">
-            <div>
-              <p class="text-xs text-pink-400">{{ formatDate(s.date) }}</p>
-              <h3 class="font-bold text-rose-800">{{ s.title_override || s.title || '제목 없음' }}</h3>
+          <!-- View mode -->
+          <template v-if="editingId !== s.id">
+            <div class="flex justify-between items-start mb-2">
+              <div>
+                <p class="text-xs text-[#c9a96e]">{{ formatDate(s.date) }}</p>
+                <h3 class="font-bold text-[#5d4e37] font-display">{{ s.title_override || s.title || '제목 없음' }}</h3>
+              </div>
+              <div class="flex gap-1.5">
+                <button @click="startEdit(s)" class="text-xs text-[#c9a96e] hover:text-[#b08d4f] transition-colors">수정</button>
+                <button @click="confirmDelete(s)" :disabled="deletingId === s.id"
+                  class="text-xs text-red-400 hover:text-red-500 transition-colors disabled:opacity-50">
+                  {{ deletingId === s.id ? '삭제중...' : '삭제' }}
+                </button>
+              </div>
             </div>
-            <button @click="editTitle(s)" class="text-xs text-pink-400 hover:text-pink-600">수정</button>
-          </div>
-          <p class="text-sm text-rose-700/80 line-clamp-3">{{ s.diary_text }}</p>
-          <div v-if="s.mood" class="mt-2 flex gap-1 flex-wrap">
-            <span v-for="(val, key) in s.mood" :key="key"
-              class="text-xs bg-pink-50 rounded-full px-2 py-0.5 text-pink-500">
-              {{ key }}: {{ val }}
-            </span>
-          </div>
+            <p class="text-sm text-[#5d4e37]/80 line-clamp-3">{{ s.diary_text }}</p>
+            <div v-if="s.mood" class="mt-2 flex gap-1 flex-wrap">
+              <span v-for="(val, key) in s.mood" :key="key"
+                class="text-xs bg-[#f5ead6] rounded-full px-2 py-0.5 text-[#8a7560]">
+                {{ key }}: {{ val }}
+              </span>
+            </div>
+          </template>
+
+          <!-- Edit mode -->
+          <template v-else>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs text-[#b5a48e] mb-1 block">제목</label>
+                <input v-model="editTitle"
+                  class="w-full bg-[#f5ead6]/40 text-[#5d4e37] text-sm rounded-lg px-3 py-2 border border-[#ecdcc5] focus:border-[#c9a96e] focus:outline-none" />
+              </div>
+              <div>
+                <label class="text-xs text-[#b5a48e] mb-1 block">내용</label>
+                <textarea v-model="editContent" rows="5"
+                  class="w-full bg-[#f5ead6]/40 text-[#5d4e37] text-sm rounded-lg px-3 py-2 border border-[#ecdcc5] focus:border-[#c9a96e] focus:outline-none resize-none" />
+              </div>
+              <div class="flex gap-2 justify-end">
+                <button @click="cancelEdit"
+                  class="text-xs bg-[#ecdcc5] text-[#8a7560] px-4 py-2 rounded-lg hover:bg-[#e0d0b5] transition-colors font-medium">
+                  취소
+                </button>
+                <button @click="saveEdit(s)" :disabled="savingEdit"
+                  class="text-xs bg-[#c9a96e] hover:bg-[#b08d4f] text-white px-4 py-2 rounded-lg transition-colors font-medium disabled:opacity-50">
+                  {{ savingEdit ? '저장 중...' : '저장' }}
+                </button>
+              </div>
+            </div>
+          </template>
         </CardWrapper>
       </div>
 
       <!-- Calls Tab -->
       <div v-if="activeTab === 'calls'" class="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
-        <label class="block w-full bg-gradient-to-r from-sky-400 to-blue-400 hover:from-sky-500 hover:to-blue-500 text-white font-semibold py-3 rounded-xl text-center cursor-pointer transition-all shadow-md shadow-sky-200">
+        <label class="block w-full bg-gradient-to-r from-[#d4a574] to-[#c08a56] hover:from-[#c08a56] hover:to-[#b08d4f] text-white font-semibold py-3 rounded-xl text-center cursor-pointer transition-all shadow-md shadow-[#d4a574]/20">
           {{ uploadingAudio ? uploadProgress : '통화 음성 업로드' }}
           <input type="file" accept="audio/*" @change="uploadCallAudio" class="hidden" :disabled="uploadingAudio" />
         </label>
 
-        <div v-if="diary.callLogs.length === 0" class="text-center text-sky-300 py-12">
+        <div v-if="diary.callLogs.length === 0" class="text-center text-[#d4bfa0] py-12">
           <div class="text-2xl mb-2">&#x2764;</div>
           통화 기록이 없습니다
         </div>
 
         <CardWrapper v-for="call in diary.callLogs" :key="call.id"
           class="cursor-pointer" @click="router.push(`/diary/call/${call.id}`)">
-          <p class="text-xs text-sky-400">{{ formatDate(call.occurred_at) }}</p>
-          <h3 class="font-bold text-rose-800 mt-1">{{ call.summary?.slice(0, 60) || '통화 기록' }}...</h3>
+          <p class="text-xs text-[#d4a574]">{{ formatDate(call.occurred_at) }}</p>
+          <h3 class="font-bold text-[#5d4e37] font-display mt-1">{{ call.summary?.slice(0, 60) || '통화 기록' }}...</h3>
           <div v-if="call.keywords" class="mt-2 flex flex-wrap gap-1">
             <span v-for="kw in (Array.isArray(call.keywords) ? call.keywords.slice(0, 5) : [])" :key="kw"
-              class="text-xs bg-sky-50 text-sky-500 rounded-full px-2 py-0.5">
+              class="text-xs bg-[#faebd7] text-[#8a7560] rounded-full px-2 py-0.5">
               {{ kw }}
             </span>
           </div>

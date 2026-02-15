@@ -62,14 +62,14 @@ onMounted(async () => {
 <template>
   <div class="h-full flex flex-col">
     <div class="flex items-center gap-2 px-4 pt-4 pb-2">
-      <button @click="router.back()" class="text-pink-400 hover:text-pink-600">
+      <button @click="router.back()" class="text-[#c9a96e] hover:text-[#8a7560]">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
       </button>
       <div>
-        <h1 class="text-lg font-bold text-rose-800">{{ day?.title_override || day?.title || day?.date || '...' }}</h1>
-        <p class="text-xs text-pink-400/70">{{ day?.date }}</p>
+        <h1 class="text-lg font-bold font-display text-[#5d4e37]">{{ day?.title_override || day?.title || day?.date || '...' }}</h1>
+        <p class="text-xs text-[#b08d4f]/70">{{ day?.date }}</p>
       </div>
     </div>
 
@@ -80,7 +80,7 @@ onMounted(async () => {
         {{ loadError }}
       </div>
 
-      <div v-else-if="!loading && messages.length === 0" class="text-center text-pink-300 py-12">
+      <div v-else-if="!loading && messages.length === 0" class="text-center text-[#d4bfa0] py-12">
         <div class="text-2xl mb-2">&#x2764;</div>
         이 날의 메시지가 없습니다
       </div>
@@ -88,16 +88,16 @@ onMounted(async () => {
       <div v-for="msg in messages" :key="msg.id"
         class="flex" :class="isMe(msg) ? 'justify-end' : 'justify-start'">
         <div class="max-w-[75%]">
-          <p class="text-[10px] mb-1" :class="isMe(msg) ? 'text-right text-pink-400' : 'text-sky-400'">
+          <p class="text-[10px] mb-1" :class="isMe(msg) ? 'text-right text-[#c9a96e]' : 'text-[#d4a574]'">
             {{ msg.profiles?.nickname || '...' }}
           </p>
           <div class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed"
             :class="isMe(msg)
-              ? 'bg-gradient-to-br from-pink-400 to-rose-400 text-white rounded-br-md shadow-sm shadow-pink-200'
-              : 'bg-white text-rose-800 rounded-bl-md border border-sky-100 shadow-sm shadow-sky-100/50'">
+              ? 'bg-gradient-to-br from-[#c9a96e] to-[#d4a574] text-white rounded-br-md shadow-sm shadow-[#ecdcc5]'
+              : 'bg-white text-[#5d4e37] rounded-bl-md border border-[#ecdcc5] shadow-sm shadow-[#ecdcc5]/50'">
             {{ msg.text }}
           </div>
-          <p class="text-[10px] mt-1 text-pink-300/60" :class="isMe(msg) ? 'text-right' : ''">
+          <p class="text-[10px] mt-1 text-[#d4bfa0]/60" :class="isMe(msg) ? 'text-right' : ''">
             {{ new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) }}
           </p>
         </div>

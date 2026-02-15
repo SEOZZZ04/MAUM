@@ -102,21 +102,21 @@ function copyCode() {
     <div class="px-4 pb-8 space-y-4">
       <!-- Profile -->
       <CardWrapper>
-        <h3 class="font-bold text-rose-800 mb-3">프로필</h3>
+        <h3 class="font-bold text-[#5d4e37] mb-3">프로필</h3>
         <div class="flex items-center gap-3 mb-4">
-          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-pink-200 to-sky-200 flex items-center justify-center text-pink-600 text-xl font-bold">
+          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-[#ecdcc5] to-[#ecdcc5] flex items-center justify-center text-[#8a7560] text-xl font-bold">
             {{ auth.profile?.nickname?.[0] || '?' }}
           </div>
           <div>
-            <p class="font-medium text-rose-800">{{ auth.profile?.nickname }}</p>
-            <p class="text-xs text-pink-400/70">{{ auth.user?.email }}</p>
-            <p v-if="auth.isGuest" class="text-xs text-pink-500 font-medium">게스트 계정</p>
+            <p class="font-medium text-[#5d4e37]">{{ auth.profile?.nickname }}</p>
+            <p class="text-xs text-[#b08d4f]/70">{{ auth.user?.email }}</p>
+            <p v-if="auth.isGuest" class="text-xs text-[#b08d4f] font-medium">게스트 계정</p>
           </div>
         </div>
         <div class="flex gap-2">
           <input v-model="nickname" placeholder="닉네임"
-            class="flex-1 bg-pink-50/50 text-rose-800 text-sm rounded-lg px-3 py-2 border border-pink-200 focus:border-pink-400 focus:outline-none" />
-          <button @click="saveNickname" class="bg-pink-400 hover:bg-pink-500 text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium">
+            class="flex-1 bg-[#f5ead6]/40 text-[#5d4e37] text-sm rounded-lg px-3 py-2 border border-[#ecdcc5] focus:border-[#c9a96e] focus:outline-none" />
+          <button @click="saveNickname" class="bg-[#c9a96e] hover:bg-[#b08d4f] text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium">
             저장
           </button>
         </div>
@@ -124,13 +124,13 @@ function copyCode() {
 
       <!-- Couple Status -->
       <CardWrapper>
-        <h3 class="font-bold text-rose-800 mb-3">커플 연동</h3>
+        <h3 class="font-bold text-[#5d4e37] mb-3">커플 연동</h3>
         <div v-if="couple.isConnected" class="text-green-600 flex items-center gap-2 mb-3">
           <span class="w-2 h-2 rounded-full bg-green-500 pulse-online"></span>
           연결됨 — {{ couple.partner?.nickname || '상대방' }}
         </div>
-        <div v-else class="text-pink-400 flex items-center gap-2 mb-3">
-          <span class="w-2 h-2 rounded-full bg-pink-400"></span>
+        <div v-else class="text-[#c9a96e] flex items-center gap-2 mb-3">
+          <span class="w-2 h-2 rounded-full bg-[#c9a96e]"></span>
           미연결
         </div>
 
@@ -152,7 +152,7 @@ function copyCode() {
               {{ disconnecting ? '해지 중...' : '해지하기' }}
             </button>
             <button @click="showDisconnectConfirm = false"
-              class="flex-1 bg-pink-100 hover:bg-pink-200 text-pink-600 py-2 rounded-lg text-sm font-semibold transition-colors">
+              class="flex-1 bg-[#ecdcc5] hover:bg-[#ecdcc5] text-[#8a7560] py-2 rounded-lg text-sm font-semibold transition-colors">
               취소
             </button>
           </div>
@@ -160,23 +160,23 @@ function copyCode() {
 
         <!-- Create invite -->
         <div v-if="!couple.isConnected" class="space-y-3">
-          <button @click="createInvite" class="w-full bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-500 hover:to-rose-500 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm shadow-pink-200">
+          <button @click="createInvite" class="w-full bg-gradient-to-r from-[#c9a96e] to-[#d4a574] hover:from-[#b08d4f] hover:to-[#b08d4f] text-white py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm shadow-[#ecdcc5]">
             초대코드 생성
           </button>
-          <div v-if="generatedCode" class="bg-pink-50 border border-pink-200 rounded-lg p-3">
-            <p class="text-xs text-pink-400/70 mb-1">초대코드 (24시간 유효):</p>
+          <div v-if="generatedCode" class="bg-[#f5ead6]/40 border border-[#ecdcc5] rounded-lg p-3">
+            <p class="text-xs text-[#b08d4f]/70 mb-1">초대코드 (24시간 유효):</p>
             <div class="flex items-center gap-2">
-              <code class="text-pink-600 text-lg font-mono flex-1">{{ generatedCode }}</code>
-              <button @click="copyCode" class="text-xs bg-pink-200 text-pink-700 px-3 py-1 rounded-lg hover:bg-pink-300 transition-colors">복사</button>
+              <code class="text-[#8a7560] text-lg font-mono flex-1">{{ generatedCode }}</code>
+              <button @click="copyCode" class="text-xs bg-[#ecdcc5] text-[#5d4e37] px-3 py-1 rounded-lg hover:bg-[#d4bfa0] transition-colors">복사</button>
             </div>
           </div>
 
-          <div class="border-t border-pink-100 pt-3">
-            <p class="text-sm text-pink-400/70 mb-2">상대방의 초대코드 입력</p>
+          <div class="border-t border-[#ecdcc5] pt-3">
+            <p class="text-sm text-[#b08d4f]/70 mb-2">상대방의 초대코드 입력</p>
             <div class="flex gap-2">
               <input v-model="redeemCode" placeholder="초대코드 입력"
-                class="flex-1 bg-pink-50/50 text-rose-800 text-sm rounded-lg px-3 py-2 border border-pink-200 focus:border-pink-400 focus:outline-none" />
-              <button @click="redeem" class="bg-sky-400 hover:bg-sky-500 text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium">
+                class="flex-1 bg-[#f5ead6]/40 text-[#5d4e37] text-sm rounded-lg px-3 py-2 border border-[#ecdcc5] focus:border-[#c9a96e] focus:outline-none" />
+              <button @click="redeem" class="bg-[#d4a574] hover:bg-[#c9a96e] text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium">
                 입력
               </button>
             </div>
@@ -188,9 +188,9 @@ function copyCode() {
 
       <!-- Kakao Upload -->
       <CardWrapper v-if="couple.isConnected">
-        <h3 class="font-bold text-rose-800 mb-3">카카오톡 대화 업로드</h3>
-        <p class="text-xs text-pink-400/70 mb-3">카카오톡에서 내보낸 TXT 파일을 업로드하세요</p>
-        <label class="block w-full bg-pink-50 hover:bg-pink-100 text-pink-600 font-semibold py-3 rounded-xl text-center cursor-pointer text-sm transition-colors border border-pink-200">
+        <h3 class="font-bold text-[#5d4e37] mb-3">카카오톡 대화 업로드</h3>
+        <p class="text-xs text-[#b08d4f]/70 mb-3">카카오톡에서 내보낸 TXT 파일을 업로드하세요</p>
+        <label class="block w-full bg-[#f5ead6]/40 hover:bg-[#ecdcc5] text-[#8a7560] font-semibold py-3 rounded-xl text-center cursor-pointer text-sm transition-colors border border-[#ecdcc5]">
           {{ uploadingKakao ? '업로드 중...' : 'TXT 파일 선택' }}
           <input type="file" accept=".txt" @change="uploadKakaoTxt" class="hidden" :disabled="uploadingKakao" />
         </label>
@@ -198,7 +198,7 @@ function copyCode() {
           <div v-if="kakaoResult.error" class="text-red-400">{{ kakaoResult.error }}</div>
           <div v-else class="text-green-600">
             <p>{{ kakaoResult.message_count || 0 }}개 메시지 반영 완료</p>
-            <p v-if="kakaoResult.dates" class="text-xs text-pink-400/70 mt-1">
+            <p v-if="kakaoResult.dates" class="text-xs text-[#b08d4f]/70 mt-1">
               반영된 날짜: {{ kakaoResult.dates?.join(', ') }}
             </p>
           </div>
@@ -207,9 +207,9 @@ function copyCode() {
 
       <!-- Admin Link -->
       <CardWrapper v-if="auth.isAdmin">
-        <router-link to="/admin" class="flex items-center justify-between text-rose-800">
+        <router-link to="/admin" class="flex items-center justify-between text-[#5d4e37]">
           <span class="font-bold">관리자 대시보드</span>
-          <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-[#c9a96e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
           </svg>
         </router-link>
@@ -217,7 +217,7 @@ function copyCode() {
 
       <!-- Logout -->
       <button @click="auth.signOut()"
-        class="w-full text-pink-400 hover:text-red-500 text-sm py-3 transition-colors font-medium">
+        class="w-full text-[#c9a96e] hover:text-red-500 text-sm py-3 transition-colors font-medium">
         로그아웃
       </button>
     </div>

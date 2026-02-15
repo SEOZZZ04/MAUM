@@ -199,6 +199,24 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  // Build a context summary from all messages to give the AI full conversation awareness
+  function _buildContextSummary() {
+    if (messages.value.length <= 10) return ''
+    // Summarize earlier messages (before the last 10) as context
+    const earlier = messages.value.slice(0, -10)
+    const speakers = new Set()
+    const topics = []
+    for (const m of earlier) {
+      if (m.profiles?.nickname) speakers.add(m.profiles.nickname)
+      if (m.text?.length > 10) {
+        topics.push(`${m.profiles?.nickname || '?'}: ${m.text.slice(0, 60)}`)
+      }
+    }
+    const speakerList = [...speakers].join(', ')
+    const topicSample = topics.slice(-10).join('\n')
+    return `화자: ${speakerList}\n이전 대화 내용 일부:\n${topicSample}`
+  }
+
   // Extract knowledge graph from recent messages
   async function triggerGraphExtraction() {
     if (extractingGraph.value) return
@@ -209,10 +227,13 @@ export const useChatStore = defineStore('chat', () => {
     _persistMsgCount()
 
     try {
-      const recentMessages = messages.value.slice(-10)
+      // Send more messages (up to 20) with speaker info for better context
+      const recentMessages = messages.value.slice(-20)
       const conversationText = recentMessages
-        .map(m => `${m.profiles?.nickname || '?'}: ${m.text}`)
+        .map(m => `[${m.profiles?.nickname || '?'}]: ${m.text}`)
         .join('\n')
+
+      const contextSummary = _buildContextSummary()
 
       const sourceInfo = {
         type: 'chat',
@@ -220,7 +241,7 @@ export const useChatStore = defineStore('chat', () => {
         date: todayThread.value?.date || _getKSTDateStr()
       }
 
-      await api.extractGraph(conversationText, sourceInfo)
+      await api.extractGraph(conversationText, sourceInfo, contextSummary)
     } catch (e) {
       console.warn('Graph extraction failed:', e.message)
     }

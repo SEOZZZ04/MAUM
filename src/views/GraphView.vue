@@ -32,7 +32,6 @@ onUnmounted(() => {
 function onSearch() {
   const results = graph.searchNodes(searchInput.value)
   searchResultCount.value = results ? results.length : 0
-  // Trigger zoom-to-node in the canvas
   if (graphCanvasRef.value && searchInput.value.trim()) {
     graphCanvasRef.value.zoomToSearch(searchInput.value)
   }
@@ -54,7 +53,7 @@ async function askAnalysis() {
 }
 
 const nodeTypeColors = {
-  person: '#ec4899',
+  person: '#c9a96e',
   topic: '#a78bfa',
   event: '#fb923c',
   emotion: '#f87171',
@@ -80,7 +79,7 @@ const nodeTypeLabels = {
   <div class="h-full flex flex-col">
     <PageHeader title="지식 그래프" subtitle="관계의 패턴을 시각화합니다" />
 
-    <div v-if="!couple.isConnected" class="flex-1 flex items-center justify-center text-pink-400">
+    <div v-if="!couple.isConnected" class="flex-1 flex items-center justify-center text-[#b5a48e]">
       커플 연동 후 이용 가능합니다
     </div>
 
@@ -90,31 +89,31 @@ const nodeTypeLabels = {
         <div class="flex-1 relative">
           <input v-model="searchInput" @input="onSearch"
             placeholder="키워드로 검색... (노드를 찾아 확대합니다)"
-            class="w-full bg-white text-rose-800 text-sm rounded-xl px-4 py-2.5 border border-pink-200 focus:border-pink-400 focus:outline-none shadow-sm" />
+            class="w-full bg-[#fffcf7] text-[#5d4e37] text-sm rounded-xl px-4 py-2.5 border border-[#ecdcc5] focus:border-[#c9a96e] focus:outline-none shadow-sm" />
           <span v-if="searchInput && searchResultCount > 0"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-pink-400 bg-pink-50 px-2 py-0.5 rounded-full">
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#c9a96e] bg-[#f5ead6] px-2 py-0.5 rounded-full">
             {{ searchResultCount }}개 발견
           </span>
         </div>
         <button @click="showAnalysis = !showAnalysis"
-          class="text-xs bg-purple-50 text-purple-500 px-3 py-2 rounded-xl hover:bg-purple-100 transition-colors font-medium border border-purple-200">
+          class="text-xs bg-[#c9b8d9]/15 text-[#8a6fa0] px-3 py-2 rounded-xl hover:bg-[#c9b8d9]/25 transition-colors font-medium border border-[#c9b8d9]/30">
           분석
         </button>
       </div>
 
       <!-- Analysis Panel -->
-      <div v-if="showAnalysis" class="mx-4 mb-2 bg-purple-50/60 border border-purple-200 rounded-xl p-4">
+      <div v-if="showAnalysis" class="mx-4 mb-2 bg-[#c9b8d9]/10 border border-[#c9b8d9]/30 rounded-xl p-4">
         <div class="flex gap-2 mb-3">
           <input v-model="analysisQuestion" @keydown.enter="askAnalysis"
             placeholder="예: 왜 이런 감정이 생겼는지?"
-            class="flex-1 bg-white text-rose-800 text-sm rounded-lg px-3 py-2 border border-purple-200 focus:border-purple-400 focus:outline-none" />
+            class="flex-1 bg-white text-[#5d4e37] text-sm rounded-lg px-3 py-2 border border-[#c9b8d9]/30 focus:border-[#c9b8d9] focus:outline-none" />
           <button @click="askAnalysis" :disabled="analysisLoading"
-            class="bg-purple-400 hover:bg-purple-500 text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50 font-medium">
+            class="bg-[#c9b8d9]/60 hover:bg-[#c9b8d9]/80 text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50 font-medium">
             질문
           </button>
         </div>
-        <div v-if="analysisLoading" class="text-purple-400 text-sm animate-pulse">분석 중...</div>
-        <div v-else-if="analysisResult" class="text-sm text-rose-700 whitespace-pre-wrap">{{ analysisResult.answer }}</div>
+        <div v-if="analysisLoading" class="text-[#8a6fa0] text-sm animate-pulse">분석 중...</div>
+        <div v-else-if="analysisResult" class="text-sm text-[#5d4e37] whitespace-pre-wrap">{{ analysisResult.answer }}</div>
       </div>
 
       <!-- Node type legend -->
@@ -127,7 +126,7 @@ const nodeTypeLabels = {
       </div>
 
       <!-- Graph -->
-      <div class="flex-1 relative rounded-2xl mx-4 mb-2 overflow-hidden border border-pink-100/60 bg-gradient-to-br from-white via-pink-50/20 to-sky-50/30">
+      <div class="flex-1 relative rounded-2xl mx-4 mb-2 overflow-hidden border border-[#ecdcc5]/60 bg-gradient-to-br from-[#fffcf7] via-[#f5ead6]/20 to-[#faebd7]/30">
         <LoadingSpinner v-if="graph.loading" />
         <GraphCanvas
           v-else
@@ -137,33 +136,32 @@ const nodeTypeLabels = {
           :search-query="graph.searchQuery"
           @node-click="onNodeClick"
         />
-        <!-- Empty state -->
         <div v-if="!graph.loading && graph.nodes.length === 0"
-          class="absolute inset-0 flex flex-col items-center justify-center text-pink-300">
+          class="absolute inset-0 flex flex-col items-center justify-center text-[#d4bfa0]">
           <div class="text-3xl mb-2">&#x2764;</div>
           <p class="text-sm">아직 그래프 데이터가 없어요</p>
-          <p class="text-xs mt-1 text-pink-200">채팅에서 대화하면 자동으로 생성됩니다</p>
+          <p class="text-xs mt-1 text-[#ecdcc5]">채팅에서 대화하면 자동으로 생성됩니다</p>
         </div>
       </div>
 
       <!-- Selected node info -->
-      <div v-if="selectedNode" class="mx-4 mb-2 bg-white border border-pink-100/60 rounded-xl p-4 card-cute">
+      <div v-if="selectedNode" class="mx-4 mb-2 bg-[#fffcf7] border border-[#ecdcc5]/60 rounded-xl p-4 card-cute">
         <div class="flex justify-between items-start">
           <div>
             <span class="text-xs px-2.5 py-0.5 rounded-full font-medium"
               :style="{ backgroundColor: (nodeTypeColors[selectedNode.type] || '#888') + '20', color: nodeTypeColors[selectedNode.type] }">
               {{ nodeTypeLabels[selectedNode.type] || selectedNode.type }}
             </span>
-            <h3 class="text-lg font-bold text-rose-800 mt-1">{{ selectedNode.label }}</h3>
-            <p class="text-sm text-pink-400/70">weight: {{ selectedNode.weight }}</p>
+            <h3 class="text-lg font-bold text-[#5d4e37] font-display mt-1">{{ selectedNode.label }}</h3>
+            <p class="text-sm text-[#b5a48e]">가중치: {{ selectedNode.weight }}</p>
           </div>
-          <button @click="selectedNode = null" class="text-pink-300 hover:text-pink-500 text-lg">&times;</button>
+          <button @click="selectedNode = null" class="text-[#d4bfa0] hover:text-[#8a7560] text-lg">&times;</button>
         </div>
         <div v-if="graph.getRelatedEdges(selectedNode.id).length" class="mt-3 space-y-1">
-          <p class="text-xs text-pink-400/70">관련 관계:</p>
+          <p class="text-xs text-[#b5a48e]">관련 관계:</p>
           <div v-for="edge in graph.getRelatedEdges(selectedNode.id)" :key="edge.id"
-            class="text-xs text-rose-700 bg-pink-50/60 rounded-lg px-2.5 py-1.5">
-            {{ edge.relation }} (weight: {{ edge.weight }})
+            class="text-xs text-[#5d4e37] bg-[#f5ead6]/60 rounded-lg px-2.5 py-1.5">
+            {{ edge.relation }} (가중치: {{ edge.weight }})
           </div>
         </div>
       </div>

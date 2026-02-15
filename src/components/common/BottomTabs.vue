@@ -15,14 +15,14 @@ function isActive(path) {
 </script>
 
 <template>
-  <nav class="bg-white/90 backdrop-blur border-t border-pink-100 px-2 pb-[env(safe-area-inset-bottom)]">
+  <nav class="bg-[#fffcf7]/90 backdrop-blur border-t border-[#ecdcc5] px-2 pb-[env(safe-area-inset-bottom)]">
     <div class="flex justify-around">
       <router-link
         v-for="tab in tabs"
         :key="tab.path"
         :to="tab.path"
         class="flex flex-col items-center py-2 px-3 text-xs transition-colors"
-        :class="isActive(tab.path) ? 'text-pink-500' : 'text-pink-300 hover:text-pink-400'"
+        :class="isActive(tab.path) ? 'text-[#c9a96e]' : 'text-[#d4bfa0] hover:text-[#b08d4f]'"
       >
         <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" :d="tab.icon" />
