@@ -8,6 +8,12 @@ interface GraphExtraction {
   edges: Array<{ source: string; source_type: string; target: string; target_type: string; relation: string }>
 }
 
+const HUB_NODE = { label: '커플 대화 허브', type: 'topic' } as const
+
+const normalizeNodeLabel = (label: string) => label.trim().replace(/\s+/g, ' ')
+const normalizeNodeType = (type: string) => type.trim().toLowerCase()
+const nodeKey = (label: string, type: string) => `${normalizeNodeLabel(label)}:${normalizeNodeType(type)}`
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -108,14 +114,26 @@ ${existingNodesBlock}${contextBlock}
 
     // Upsert nodes
     const nodeIds: Record<string, string> = {}
-    for (const node of (extraction.nodes || [])) {
+    const newlyCreatedNodeIds = new Set<string>()
+    const newlyCreatedNonSeedNodeIds = new Set<string>()
+
+    const ensureNode = async (
+      rawLabel: string,
+      rawType: string,
+      options: { nonSeed: boolean },
+    ): Promise<string | null> => {
+      const label = normalizeNodeLabel(rawLabel)
+      const type = normalizeNodeType(rawType)
+      const key = nodeKey(label, type)
+      if (nodeIds[key]) return nodeIds[key]
+
       // First check if node exists (exact match)
       const { data: existing } = await admin
         .from('graph_nodes')
         .select('id, weight')
         .eq('couple_id', coupleId)
-        .eq('label', node.label)
-        .eq('type', node.type)
+        .eq('label', label)
+        .eq('type', type)
         .maybeSingle()
 
       if (existing) {
@@ -126,14 +144,15 @@ ${existingNodesBlock}${contextBlock}
             last_seen_at: new Date().toISOString(),
           })
           .eq('id', existing.id)
-        nodeIds[`${node.label}:${node.type}`] = existing.id
+        nodeIds[key] = existing.id
+        return existing.id
       } else {
         const { data, error } = await admin
           .from('graph_nodes')
           .insert({
             couple_id: coupleId,
-            label: node.label,
-            type: node.type,
+            label,
+            type,
             weight: 1,
             last_seen_at: new Date().toISOString(),
           })
@@ -141,77 +160,157 @@ ${existingNodesBlock}${contextBlock}
           .single()
 
         if (!error && data) {
-          nodeIds[`${node.label}:${node.type}`] = data.id
+          nodeIds[key] = data.id
+          newlyCreatedNodeIds.add(data.id)
+          if (options.nonSeed) newlyCreatedNonSeedNodeIds.add(data.id)
+          return data.id
         }
       }
+
+      return null
     }
 
-    // Also resolve existing nodes referenced in edges but not in current extraction
-    // This allows linking new nodes to existing ones
-    for (const edge of (extraction.edges || [])) {
-      for (const side of ['source', 'target'] as const) {
-        const label = edge[side]
-        const type = side === 'source' ? edge.source_type : edge.target_type
-        const key = `${label}:${type}`
-        if (!nodeIds[key]) {
-          // Check if this node already exists in the DB
-          const { data: existingNode } = await admin
-            .from('graph_nodes')
-            .select('id')
-            .eq('couple_id', coupleId)
-            .eq('label', label)
-            .eq('type', type)
-            .maybeSingle()
-          if (existingNode) {
-            nodeIds[key] = existingNode.id
-          }
-        }
-      }
+    const normalizedNodes = (extraction.nodes || []).map((node) => ({
+      label: normalizeNodeLabel(node.label),
+      type: normalizeNodeType(node.type),
+    }))
+
+    for (const node of normalizedNodes) {
+      await ensureNode(node.label, node.type, { nonSeed: true })
     }
 
-    // Upsert edges
-    let edgesCreated = 0
-    for (const edge of (extraction.edges || [])) {
-      const sourceId = nodeIds[`${edge.source}:${edge.source_type}`]
-      const targetId = nodeIds[`${edge.target}:${edge.target_type}`]
-      if (!sourceId || !targetId) continue
+    const normalizedEdges = (extraction.edges || []).map((edge) => ({
+      source: normalizeNodeLabel(edge.source),
+      source_type: normalizeNodeType(edge.source_type),
+      target: normalizeNodeLabel(edge.target),
+      target_type: normalizeNodeType(edge.target_type),
+      relation: edge.relation.trim(),
+    }))
 
-      const { data: existingEdge } = await admin
+    let edgeInsertFailedCount = 0
+
+    // If edge endpoints are not in DB, create them immediately and retry linking.
+    for (const edge of normalizedEdges) {
+      const sourceId = await ensureNode(edge.source, edge.source_type, { nonSeed: false })
+      if (!sourceId) edgeInsertFailedCount++
+
+      const targetId = await ensureNode(edge.target, edge.target_type, { nonSeed: false })
+      if (!targetId) edgeInsertFailedCount++
+    }
+
+    const upsertEdge = async (
+      sourceId: string,
+      targetId: string,
+      relation: string,
+      evidence: string[] = [],
+    ): Promise<boolean> => {
+      const { data: existingEdge, error: existingEdgeError } = await admin
         .from('graph_edges')
         .select('id, weight')
         .eq('couple_id', coupleId)
         .eq('source_node_id', sourceId)
         .eq('target_node_id', targetId)
-        .eq('relation', edge.relation)
+        .eq('relation', relation)
         .maybeSingle()
 
+      if (existingEdgeError) return false
+
       if (existingEdge) {
-        await admin
+        const { error: updateError } = await admin
           .from('graph_edges')
           .update({
             weight: existingEdge.weight + 1,
             last_seen_at: new Date().toISOString(),
           })
           .eq('id', existingEdge.id)
-      } else {
-        await admin
-          .from('graph_edges')
-          .insert({
-            couple_id: coupleId,
-            source_node_id: sourceId,
-            target_node_id: targetId,
-            relation: edge.relation,
-            weight: 1,
-            last_seen_at: new Date().toISOString(),
-            evidence: source_info ? [source_info] : [],
-          })
+        return !updateError
       }
-      edgesCreated++
+
+      const { error: insertError } = await admin
+        .from('graph_edges')
+        .insert({
+          couple_id: coupleId,
+          source_node_id: sourceId,
+          target_node_id: targetId,
+          relation,
+          weight: 1,
+          last_seen_at: new Date().toISOString(),
+          evidence,
+        })
+
+      return !insertError
+    }
+
+    // Upsert edges
+    let edgesCreated = 0
+    for (const edge of normalizedEdges) {
+      const sourceId = nodeIds[nodeKey(edge.source, edge.source_type)]
+      const targetId = nodeIds[nodeKey(edge.target, edge.target_type)]
+      if (!sourceId || !targetId) {
+        edgeInsertFailedCount++
+        continue
+      }
+
+      const success = await upsertEdge(
+        sourceId,
+        targetId,
+        edge.relation,
+        source_info ? [source_info] : [],
+      )
+      if (success) {
+        edgesCreated++
+      } else {
+        edgeInsertFailedCount++
+      }
+    }
+
+    // Batch validation: every newly-created non-seed node must have at least one in/out edge.
+    let orphanPreventedCount = 0
+    if (newlyCreatedNonSeedNodeIds.size > 0) {
+      const hubId = await ensureNode(HUB_NODE.label, HUB_NODE.type, { nonSeed: false })
+
+      for (const nodeId of newlyCreatedNonSeedNodeIds) {
+        const { data: connectedEdge, error: connectedEdgeError } = await admin
+          .from('graph_edges')
+          .select('id')
+          .eq('couple_id', coupleId)
+          .or(`source_node_id.eq.${nodeId},target_node_id.eq.${nodeId}`)
+          .limit(1)
+          .maybeSingle()
+
+        if (connectedEdgeError || connectedEdge) continue
+
+        let isConnected = false
+        if (hubId && hubId !== nodeId) {
+          isConnected = await upsertEdge(nodeId, hubId, '관련됨')
+          if (isConnected) {
+            orphanPreventedCount++
+            edgesCreated++
+          } else {
+            edgeInsertFailedCount++
+          }
+        }
+
+        if (!isConnected) {
+          const { error: deleteError } = await admin
+            .from('graph_nodes')
+            .delete()
+            .eq('id', nodeId)
+            .eq('couple_id', coupleId)
+
+          if (!deleteError) {
+            orphanPreventedCount++
+            newlyCreatedNodeIds.delete(nodeId)
+          }
+        }
+      }
     }
 
     return new Response(JSON.stringify({
-      nodes_count: extraction.nodes?.length || 0,
+      nodes_count: newlyCreatedNodeIds.size,
       edges_count: edgesCreated,
+      orphan_prevented_count: orphanPreventedCount,
+      edge_insert_failed_count: edgeInsertFailedCount,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
