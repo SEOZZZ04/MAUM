@@ -8,6 +8,82 @@ interface GraphExtraction {
   edges: Array<{ source: string; source_type: string; target: string; target_type: string; relation: string }>
 }
 
+const CANONICAL_RELATIONS = [
+  'causes',
+  'relates_to',
+  'triggers',
+  'resolves',
+  'prefers',
+  'avoids',
+  'conflicts_with',
+  'supports',
+  'mentions',
+  'feels',
+  'planned_for',
+  'visits',
+  'participates_in',
+  'part_of',
+] as const
+
+const RELATION_MAP: Record<string, typeof CANONICAL_RELATIONS[number]> = {
+  // Korean relations used by prompt
+  '원인됨': 'causes',
+  '관련됨': 'relates_to',
+  '유발함': 'triggers',
+  '해결함': 'resolves',
+  '선호함': 'prefers',
+  '회피함': 'avoids',
+  '갈등됨': 'conflicts_with',
+  '지지함': 'supports',
+  '언급함': 'mentions',
+  '느낌': 'feels',
+  '계획함': 'planned_for',
+  '방문함': 'visits',
+  '참여함': 'participates_in',
+  '부분임': 'part_of',
+
+  // Canonical + common aliases
+  causes: 'causes',
+  cause: 'causes',
+  relates_to: 'relates_to',
+  related_to: 'relates_to',
+  relates: 'relates_to',
+  triggers: 'triggers',
+  trigger: 'triggers',
+  resolves: 'resolves',
+  resolve: 'resolves',
+  prefers: 'prefers',
+  prefer: 'prefers',
+  avoids: 'avoids',
+  avoid: 'avoids',
+  conflicts_with: 'conflicts_with',
+  conflict_with: 'conflicts_with',
+  supports: 'supports',
+  support: 'supports',
+  mentions: 'mentions',
+  mention: 'mentions',
+  feels: 'feels',
+  feel: 'feels',
+  planned_for: 'planned_for',
+  plans_for: 'planned_for',
+  plan_for: 'planned_for',
+  planned: 'planned_for',
+  visits: 'visits',
+  visit: 'visits',
+  participates_in: 'participates_in',
+  participate_in: 'participates_in',
+  participates: 'participates_in',
+  part_of: 'part_of',
+  partof: 'part_of',
+}
+
+function normalizeRelation(relation: string): typeof CANONICAL_RELATIONS[number] {
+  const raw = (relation || '').trim()
+  const normalizedKey = raw.toLowerCase().replace(/[\s-]+/g, '_')
+
+  return RELATION_MAP[raw] || RELATION_MAP[normalizedKey] || 'relates_to'
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -171,10 +247,22 @@ ${existingNodesBlock}${contextBlock}
 
     // Upsert edges
     let edgesCreated = 0
+    const edgeFailures: Array<{ edge: GraphExtraction['edges'][number]; reason: string }> = []
     for (const edge of (extraction.edges || [])) {
       const sourceId = nodeIds[`${edge.source}:${edge.source_type}`]
       const targetId = nodeIds[`${edge.target}:${edge.target_type}`]
-      if (!sourceId || !targetId) continue
+      if (!sourceId || !targetId) {
+        const reason = !sourceId && !targetId
+          ? 'source and target node not found'
+          : !sourceId
+            ? 'source node not found'
+            : 'target node not found'
+        edgeFailures.push({ edge, reason })
+        console.error('[extract-graph] edge skipped (node resolution failed)', { edge, reason })
+        continue
+      }
+
+      const relation = normalizeRelation(edge.relation)
 
       const { data: existingEdge } = await admin
         .from('graph_edges')
@@ -182,36 +270,49 @@ ${existingNodesBlock}${contextBlock}
         .eq('couple_id', coupleId)
         .eq('source_node_id', sourceId)
         .eq('target_node_id', targetId)
-        .eq('relation', edge.relation)
+        .eq('relation', relation)
         .maybeSingle()
 
       if (existingEdge) {
-        await admin
+        const { error: updateError } = await admin
           .from('graph_edges')
           .update({
             weight: existingEdge.weight + 1,
             last_seen_at: new Date().toISOString(),
           })
           .eq('id', existingEdge.id)
+        if (updateError) {
+          edgeFailures.push({ edge, reason: updateError.message })
+          console.error('[extract-graph] edge update failed', { edge, relation, error: updateError.message })
+          continue
+        }
       } else {
-        await admin
+        const { error: insertError } = await admin
           .from('graph_edges')
           .insert({
             couple_id: coupleId,
             source_node_id: sourceId,
             target_node_id: targetId,
-            relation: edge.relation,
+            relation,
             weight: 1,
             last_seen_at: new Date().toISOString(),
             evidence: source_info ? [source_info] : [],
           })
+        if (insertError) {
+          edgeFailures.push({ edge, reason: insertError.message })
+          console.error('[extract-graph] edge insert failed', { edge, relation, error: insertError.message })
+          continue
+        }
       }
+
       edgesCreated++
     }
 
     return new Response(JSON.stringify({
       nodes_count: extraction.nodes?.length || 0,
       edges_count: edgesCreated,
+      edge_failures_count: edgeFailures.length,
+      edge_failures: edgeFailures,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
