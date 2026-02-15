@@ -8,6 +8,28 @@ interface GraphExtraction {
   edges: Array<{ source: string; source_type: string; target: string; target_type: string; relation: string }>
 }
 
+
+const RELATION_MAP: Record<string, string> = {
+  '원인됨': 'causes',
+  '관련됨': 'relates_to',
+  '유발함': 'triggers',
+  '해결함': 'resolves',
+  '선호함': 'prefers',
+  '회피함': 'avoids',
+  '갈등됨': 'conflicts_with',
+  '지지함': 'supports',
+  '언급함': 'mentioned_by',
+  '느낌': 'relates_to',
+  '계획함': 'planned_for',
+  '방문함': 'part_of',
+  '참여함': 'instance_of',
+}
+
+function normalizeRelation(relation: string) {
+  const normalized = relation?.trim().toLowerCase()
+  return RELATION_MAP[relation] || normalized
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -29,6 +51,8 @@ serve(async (req) => {
     if (!membership) throw new Error('커플이 연동되지 않았습니다')
 
     const coupleId = membership.couple_id
+    const extractionBatchId = crypto.randomUUID()
+    const sourceDayId = source_info?.day_id || null
 
     // Fetch existing graph nodes to provide context for linking
     const { data: existingNodes } = await admin
@@ -124,6 +148,9 @@ ${existingNodesBlock}${contextBlock}
           .update({
             weight: existing.weight + 1,
             last_seen_at: new Date().toISOString(),
+            source_day_id: sourceDayId,
+            source_message_window: source_info || null,
+            extraction_batch_id: extractionBatchId,
           })
           .eq('id', existing.id)
         nodeIds[`${node.label}:${node.type}`] = existing.id
@@ -136,6 +163,9 @@ ${existingNodesBlock}${contextBlock}
             type: node.type,
             weight: 1,
             last_seen_at: new Date().toISOString(),
+            source_day_id: sourceDayId,
+            source_message_window: source_info || null,
+            extraction_batch_id: extractionBatchId,
           })
           .select('id')
           .single()
@@ -176,13 +206,15 @@ ${existingNodesBlock}${contextBlock}
       const targetId = nodeIds[`${edge.target}:${edge.target_type}`]
       if (!sourceId || !targetId) continue
 
+      const normalizedRelation = normalizeRelation(edge.relation)
+
       const { data: existingEdge } = await admin
         .from('graph_edges')
         .select('id, weight')
         .eq('couple_id', coupleId)
         .eq('source_node_id', sourceId)
         .eq('target_node_id', targetId)
-        .eq('relation', edge.relation)
+        .eq('relation', normalizedRelation)
         .maybeSingle()
 
       if (existingEdge) {
@@ -191,6 +223,9 @@ ${existingNodesBlock}${contextBlock}
           .update({
             weight: existingEdge.weight + 1,
             last_seen_at: new Date().toISOString(),
+            source_day_id: sourceDayId,
+            source_message_window: source_info || null,
+            extraction_batch_id: extractionBatchId,
           })
           .eq('id', existingEdge.id)
       } else {
@@ -200,10 +235,13 @@ ${existingNodesBlock}${contextBlock}
             couple_id: coupleId,
             source_node_id: sourceId,
             target_node_id: targetId,
-            relation: edge.relation,
+            relation: normalizedRelation,
             weight: 1,
             last_seen_at: new Date().toISOString(),
             evidence: source_info ? [source_info] : [],
+            source_day_id: sourceDayId,
+            source_message_window: source_info || null,
+            extraction_batch_id: extractionBatchId,
           })
       }
       edgesCreated++
