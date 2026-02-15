@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
+import { identifyUser } from '../lib/analytics'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -77,6 +78,14 @@ export const useAuthStore = defineStore('auth', () => {
       .eq('user_id', user.value.id)
       .single()
     profile.value = data
+
+    // Identify user for analytics
+    if (data) {
+      identifyUser(user.value.id, {
+        nickname: data.nickname,
+        role: data.role
+      })
+    }
   }
 
   async function signInWithGoogle() {

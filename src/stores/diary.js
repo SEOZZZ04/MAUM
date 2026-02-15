@@ -36,6 +36,25 @@ export const useDiaryStore = defineStore('diary', () => {
     if (idx >= 0) summaries.value[idx].title_override = titleOverride
   }
 
+  async function updateSummaryContent(id, diaryText) {
+    const { error } = await supabase
+      .from('daily_summaries')
+      .update({ diary_text: diaryText })
+      .eq('id', id)
+    if (error) throw error
+    const idx = summaries.value.findIndex(s => s.id === id)
+    if (idx >= 0) summaries.value[idx].diary_text = diaryText
+  }
+
+  async function deleteSummary(id) {
+    const { error } = await supabase
+      .from('daily_summaries')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
+    summaries.value = summaries.value.filter(s => s.id !== id)
+  }
+
   async function fetchCallLogs() {
     const couple = useCoupleStore()
     if (!couple.coupleId) return
@@ -50,6 +69,7 @@ export const useDiaryStore = defineStore('diary', () => {
 
   return {
     summaries, callLogs, loading,
-    fetchSummaries, generateSummary, updateSummaryTitle, fetchCallLogs
+    fetchSummaries, generateSummary, updateSummaryTitle,
+    updateSummaryContent, deleteSummary, fetchCallLogs
   }
 })

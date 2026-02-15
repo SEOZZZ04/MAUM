@@ -1,22 +1,29 @@
 @import "tailwindcss";
 
+/* Cute Korean font — Gowun Dodum (rounded, warm) + Gamja Flower (handwriting) */
+@import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Gamja+Flower&display=swap');
+
 @theme {
-  --color-primary: #f9a8d4;
-  --color-primary-dark: #f472b6;
-  --color-primary-light: #fce7f3;
-  --color-accent: #93c5fd;
-  --color-accent-dark: #60a5fa;
-  --color-accent-light: #dbeafe;
-  --color-lavender: #c4b5fd;
-  --color-mint: #a7f3d0;
-  --color-peach: #fed7aa;
-  --color-bg: #fffbfe;
-  --color-bg-blue: #f0f9ff;
-  --color-card: #ffffff;
-  --color-card-border: #fce7f3;
-  --color-text-primary: #4a2040;
-  --color-text-secondary: #6b3a5c;
-  --color-text-muted: #a855a0;
+  /* Cozy beige / warm palette */
+  --color-primary: #c9a96e;
+  --color-primary-dark: #b08d4f;
+  --color-primary-light: #f5ead6;
+  --color-accent: #d4a574;
+  --color-accent-dark: #c08a56;
+  --color-accent-light: #faebd7;
+  --color-lavender: #c9b8d9;
+  --color-mint: #b5d8c7;
+  --color-peach: #f0c9a6;
+  --color-bg: #faf6f1;
+  --color-bg-warm: #f5ead6;
+  --color-card: #fffcf7;
+  --color-card-border: #ecdcc5;
+  --color-text-primary: #5d4e37;
+  --color-text-secondary: #8a7560;
+  --color-text-muted: #b5a48e;
+
+  --font-sans: 'Gowun Dodum', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --font-display: 'Gamja Flower', 'Gowun Dodum', cursive;
 }
 
 html, body, #app {
@@ -24,9 +31,15 @@ html, body, #app {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  font-family: 'Gowun Dodum', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
 
-/* Custom scrollbar - soft pastel pink */
+/* Display / heading font */
+.font-display {
+  font-family: 'Gamja Flower', 'Gowun Dodum', cursive;
+}
+
+/* Custom scrollbar - soft warm beige */
 ::-webkit-scrollbar {
   width: 4px;
 }
@@ -34,7 +47,7 @@ html, body, #app {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #f9a8d4;
+  background: #d4bfa0;
   border-radius: 2px;
 }
 
@@ -56,9 +69,9 @@ html, body, #app {
   filter: brightness(1.1);
 }
 
-/* Soft dreamy cloud shadows */
+/* Soft dreamy cloud shadows — warm tone */
 .card-cute {
-  box-shadow: 0 2px 16px rgba(249, 168, 212, 0.10), 0 1px 6px rgba(147, 197, 253, 0.08);
+  box-shadow: 0 2px 16px rgba(201, 169, 110, 0.08), 0 1px 6px rgba(212, 165, 116, 0.06);
 }
 
 /* Pulse glow for online indicator */
@@ -100,15 +113,23 @@ html, body, #app {
   animation: sparkle 1.2s ease-in-out infinite;
 }
 
-/* Gradient text for MAUM branding - brighter spring feel */
-.text-gradient-pink {
-  background: linear-gradient(135deg, #f472b6, #f9a8d4, #c4b5fd);
+/* Gradient text for MAUM branding - warm cozy tone */
+.text-gradient-warm {
+  background: linear-gradient(135deg, #c9a96e, #d4a574, #c9b8d9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* Decorative heart background radials - lighter and softer */
+/* Legacy alias */
+.text-gradient-pink {
+  background: linear-gradient(135deg, #c9a96e, #d4a574, #c9b8d9);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Decorative background radials - warm and cozy */
 .heart-bg {
   position: relative;
 }
@@ -120,33 +141,33 @@ html, body, #app {
   top: 0;
   left: 0;
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(249, 168, 212, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(147, 197, 253, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(196, 181, 253, 0.05) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 20%, rgba(201, 169, 110, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(212, 165, 116, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(201, 184, 217, 0.04) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* Send button gradient - brighter and warmer */
+/* Send button gradient - warm amber */
 .btn-send {
-  background: linear-gradient(135deg, #f9a8d4, #f472b6);
+  background: linear-gradient(135deg, #c9a96e, #b08d4f);
   transition: all 0.2s;
 }
 .btn-send:hover {
-  background: linear-gradient(135deg, #f472b6, #ec4899);
+  background: linear-gradient(135deg, #b08d4f, #9a7a3e);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(244, 114, 182, 0.25);
+  box-shadow: 0 4px 12px rgba(176, 141, 79, 0.25);
 }
 .btn-send:disabled {
-  background: #fce7f3;
+  background: #ecdcc5;
   transform: none;
   box-shadow: none;
 }
 
 /* Graph search highlight glow */
 @keyframes node-glow {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(244, 114, 182, 0.5)); }
-  50% { filter: drop-shadow(0 0 10px rgba(244, 114, 182, 0.8)); }
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(201, 169, 110, 0.5)); }
+  50% { filter: drop-shadow(0 0 10px rgba(201, 169, 110, 0.8)); }
 }
 .graph-highlight {
   animation: node-glow 1.5s ease-in-out infinite;

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { supabase } from '../lib/supabase'
+import { trackPageView } from '../lib/analytics'
 
 const routes = [
   {
@@ -111,6 +112,11 @@ router.beforeEach(async (to) => {
   }
 
   return true
+})
+
+// Track page views for analytics
+router.afterEach((to) => {
+  trackPageView(to.fullPath, to.name || to.path)
 })
 
 export default router

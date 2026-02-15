@@ -74,7 +74,7 @@ export const api = {
   // AI features — edge functions only (require OpenAI)
   generateDayTitle: (dayId) => callEdgeFunction('generate-day-title', { day_id: dayId }),
   generateDailySummary: (date) => callEdgeFunction('generate-daily-summary', { date }),
-  extractGraph: (text, sourceInfo) => callEdgeFunction('extract-graph', { text, source_info: sourceInfo }),
+  extractGraph: (text, sourceInfo, contextSummary) => callEdgeFunction('extract-graph', { text, source_info: sourceInfo, context_summary: contextSummary }),
   analyzeQuestion: (question) => callEdgeFunction('analyze-question', { question }),
 
   // Uploads
