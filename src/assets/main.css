@@ -1,7 +1,7 @@
-@import "tailwindcss";
-
 /* Cute Korean font — Gowun Dodum (rounded, warm) + Gamja Flower (handwriting) */
 @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Gamja+Flower&display=swap');
+
+@import "tailwindcss";
 
 @theme {
   /* Cozy beige / warm palette */

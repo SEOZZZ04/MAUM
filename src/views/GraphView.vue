@@ -1,11 +1,12 @@
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useGraphStore } from '../stores/graph'
 import { useCoupleStore } from '../stores/couple'
 import { api } from '../lib/api'
 import PageHeader from '../components/common/PageHeader.vue'
 import LoadingSpinner from '../components/common/LoadingSpinner.vue'
 import GraphCanvas from '../components/graph/GraphCanvas.vue'
+import { getEdgeRelationLabel } from '../lib/graphRelations'
 
 const graph = useGraphStore()
 const couple = useCoupleStore()
@@ -81,6 +82,13 @@ const nodeTypeColors = {
   value: '#60a5fa',
   place: '#22d3ee',
   plan: '#fbbf24'
+}
+
+
+const nodeDataMap = computed(() => new Map(graph.nodes.map(node => [node.id, node])))
+
+function formatEdgeRelation(edge) {
+  return getEdgeRelationLabel(edge, nodeDataMap.value)
 }
 
 const nodeTypeLabels = {
@@ -187,7 +195,7 @@ const nodeTypeLabels = {
           <p class="text-xs text-[#b5a48e]">관련 관계:</p>
           <div v-for="edge in graph.getRelatedEdges(selectedNode.id)" :key="edge.id"
             class="text-xs text-[#5d4e37] bg-[#f5ead6]/60 rounded-lg px-2.5 py-1.5">
-            {{ edge.relation }} (가중치: {{ edge.weight }})
+            {{ formatEdgeRelation(edge) }} (가중치: {{ edge.weight }})
           </div>
         </div>
       </div>
