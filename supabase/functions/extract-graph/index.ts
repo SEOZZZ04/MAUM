@@ -67,6 +67,18 @@ const RELATION_MAP: Record<string, typeof CANONICAL_RELATIONS[number]> = {
   '방문함': 'visits',
   '참여함': 'participates_in',
   '부분임': 'part_of',
+  '이어짐': 'relates_to',
+  '연결됨': 'relates_to',
+  '야기함': 'causes',
+  '초래함': 'causes',
+  '일으킴': 'causes',
+  '발생시킴': 'causes',
+  '촉발함': 'triggers',
+  '유도함': 'triggers',
+  '완화함': 'resolves',
+  '해소함': 'resolves',
+  '도움됨': 'supports',
+  '지탱함': 'supports',
 
   // Canonical + common aliases
   causes: 'causes',
@@ -143,10 +155,15 @@ serve(async (req) => {
       .eq('couple_id', coupleId)
 
     const corePeople: CouplePerson[] = (coupleMembers || [])
-      .map((member) => ({
-        label: ((member as any).profiles?.nickname || '').trim(),
-        type: 'person' as const,
-      }))
+      .map((member) => {
+        const nickname = ((member as any).profiles?.nickname || '').trim()
+        const fallbackLabel = member.user_id === user.id ? '나' : '상대방'
+
+        return {
+          label: nickname || fallbackLabel,
+          type: 'person' as const,
+        }
+      })
       .filter((person, index, arr) => (
         person.label.length > 0
         && arr.findIndex((p) => p.label === person.label && p.type === person.type) === index
@@ -277,7 +294,7 @@ serve(async (req) => {
 
 **필수 규칙**:
 1. 위 인물들은 이번 추출 결과의 nodes 배열에 반드시 person 타입으로 포함하세요.
-2. 위 인물들 사이의 기본 관계를 표현하는 엣지를 최소 1개 포함하세요 (예: 관련됨/지지함).
+2. 위 인물들 사이의 기본 관계를 표현하는 엣지를 최소 1개 포함하세요 (예: 지지함/관련됨).
 3. 대화에 특정 인물 언급이 적어도, 커플의 기본 관계 중심 구조는 유지해야 합니다.`
     }
 
@@ -308,6 +325,7 @@ ${corePeopleBlock}
 3. **시간적/인과적 연결**: 한 사건이 다른 사건으로 이어지면 연결하세요.
    - 예: "야근" → "피로" (유발함), "여행계획" → "설렘" (유발함)
 4. **동일 대화 맥락 내 연결**: 같은 대화 흐름에서 언급된 관련 요소들은 서로 연결하세요.
+5. **관계 타입 다양성**: 기본 연결을 모두 "관련됨"으로만 쓰지 말고 의미에 맞게 "원인됨/유발함/해결함/지지함/언급함/느낌"을 우선 사용하세요.
 ${existingNodesBlock}${contextBlock}
 
 ## 추출 기준
@@ -389,7 +407,7 @@ ${existingNodesBlock}${contextBlock}
           source_type: 'person',
           target: personB.label,
           target_type: 'person',
-          relation: '관련됨',
+          relation: '지지함',
           reason: '커플 프로필 기반 기본 관계 노드 고정',
         })
       }
