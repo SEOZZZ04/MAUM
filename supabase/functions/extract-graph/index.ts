@@ -3,10 +3,31 @@ import { corsHeaders } from '../_shared/cors.ts'
 import { getSupabaseClient, getSupabaseAdmin } from '../_shared/supabase.ts'
 import { chatCompletionJSON } from '../_shared/openai.ts'
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Step 1 output – high-level topic anchors */
+interface TopicAnchors {
+  main_topics: Array<{ label: string; type: string }>
+}
+
+/** Step 3 output – full graph extraction */
 interface GraphExtraction {
   nodes: Array<{ label: string; type: string }>
-  edges: Array<{ source: string; source_type: string; target: string; target_type: string; relation: string }>
+  edges: Array<{
+    source: string
+    source_type: string
+    target: string
+    target_type: string
+    relation: string
+    reason?: string
+  }>
 }
+
+// ---------------------------------------------------------------------------
+// Canonical relation handling
+// ---------------------------------------------------------------------------
 
 const CANONICAL_RELATIONS = [
   'causes',
@@ -84,6 +105,10 @@ function normalizeRelation(relation: string): typeof CANONICAL_RELATIONS[number]
   return RELATION_MAP[raw] || RELATION_MAP[normalizedKey] || 'relates_to'
 }
 
+// ---------------------------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------------------------
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -106,7 +131,62 @@ serve(async (req) => {
 
     const coupleId = membership.couple_id
 
-    // Fetch existing graph nodes to provide context for linking
+    // ---------------------------------------------------------------
+    // [STEP 1] 주제 앵커링 (Topic Anchoring)
+    // VIS의 "Collection / MOC" 개념: 대화의 그릇이 되는 주제를 먼저 정의
+    // 세부 사항(와인, 렌트카)이 아니라 포괄하는 상위 주제(캠핑, 여행)를 식별
+    // ---------------------------------------------------------------
+    const topicExtraction = await chatCompletionJSON<TopicAnchors>([
+      {
+        role: 'system',
+        content: `당신은 커플 대화 분석 전문가입니다. 대화 내용을 분석하여 **핵심 주제(Topic Anchor)**를 추출합니다.
+
+## 규칙
+1. 대화의 핵심 주제 1~3개만 추출하세요.
+2. 세부적인 사물(와인, 렌트카, 텐트 등)이 아니라 이를 **포괄하는 상위 개념**(캠핑, 여행, 집들이, 결혼 준비 등)이어야 합니다.
+3. 각 주제에 적절한 타입을 부여하세요: event, topic, plan, place, value 중 하나.
+4. 대화에 의미 있는 주제가 없으면 빈 배열을 반환하세요.
+
+## 예시
+- 캠핑 준비 대화 → [{"label": "캠핑", "type": "event"}]
+- 이직 고민 + 스트레스 대화 → [{"label": "이직", "type": "plan"}, {"label": "직장 스트레스", "type": "topic"}]
+- 주말 데이트 장소 대화 → [{"label": "데이트", "type": "event"}]
+
+## 응답 형식 (반드시 JSON)
+{"main_topics": [{"label": "주제명", "type": "타입"}]}`
+      },
+      { role: 'user', content: text }
+    ], { temperature: 0.1 })
+
+    const mainTopics = topicExtraction.main_topics || []
+
+    // ---------------------------------------------------------------
+    // [STEP 2] 주제 관련 기존 노드 검색 (Context Retrieval)
+    // VIS의 "검색 에이전트" 개념: 상위 50개(Weight순)가 아니라 '관련성'으로 검색
+    // 주제 앵커와 관련된 기존 노드를 찾아 LLM에게 컨텍스트로 주입
+    // ---------------------------------------------------------------
+
+    // 2a. 주제 키워드로 관련 기존 노드 검색 (ILIKE 기반)
+    let topicRelatedNodes: Array<{ label: string; type: string; weight: number }> = []
+    if (mainTopics.length > 0) {
+      const topicLabels = mainTopics.map(t => t.label)
+      // 각 주제에 대해 ILIKE 검색으로 관련 노드 찾기
+      const orFilter = topicLabels
+        .map(label => `label.ilike.%${label}%`)
+        .join(',')
+
+      const { data: relatedNodes } = await admin
+        .from('graph_nodes')
+        .select('label, type, weight')
+        .eq('couple_id', coupleId)
+        .or(orFilter)
+        .order('weight', { ascending: false })
+        .limit(20)
+
+      topicRelatedNodes = relatedNodes || []
+    }
+
+    // 2b. 기존 상위 가중치 노드도 함께 가져오기 (기존 로직 보존)
     const { data: existingNodes } = await admin
       .from('graph_nodes')
       .select('label, type, weight')
@@ -114,22 +194,63 @@ serve(async (req) => {
       .order('weight', { ascending: false })
       .limit(50)
 
-    const existingNodesList = (existingNodes || [])
+    // 2c. 주제 관련 노드 + 상위 노드를 합쳐서 중복 제거
+    const allContextNodes = new Map<string, { label: string; type: string; weight: number }>()
+
+    // 주제 관련 노드 먼저 (우선순위 높음)
+    for (const n of topicRelatedNodes) {
+      allContextNodes.set(`${n.label}:${n.type}`, n)
+    }
+    // 상위 가중치 노드 추가
+    for (const n of (existingNodes || [])) {
+      const key = `${n.label}:${n.type}`
+      if (!allContextNodes.has(key)) {
+        allContextNodes.set(key, n)
+      }
+    }
+
+    const existingNodesList = Array.from(allContextNodes.values())
       .map(n => `${n.label} (${n.type}, 가중치:${n.weight})`)
       .join(', ')
 
-    // Build context block for conversation continuity
+    // ---------------------------------------------------------------
+    // Build context blocks for prompts
+    // ---------------------------------------------------------------
+
+    // 이전 대화 맥락 블록
     let contextBlock = ''
     if (context_summary) {
       contextBlock = `\n\n## 이전 대화 맥락 요약\n${context_summary}\n위 맥락을 참고하여 새 대화에서 나온 요소들이 기존 맥락과 연결되도록 하세요.`
     }
 
-    // Build existing nodes reference
+    // 기존 노드 참조 블록
     let existingNodesBlock = ''
     if (existingNodesList) {
-      existingNodesBlock = `\n\n## 기존 그래프 노드 (이미 존재하는 노드)\n${existingNodesList}\n\n**중요**: 새로 추출하는 노드가 위 기존 노드와 의미적으로 관련이 있다면, 반드시 엣지(관계)로 연결하세요.\n예를 들어 "캠핑"이 기존 노드에 있고 대화에서 "캠핑용품"이나 "렌트카"가 언급되면, "캠핑용품"→"캠핑" (관련됨), "렌트카"→"캠핑" (관련됨) 관계를 만드세요.\n기존 노드와 동일한 개념이면 같은 label을 사용하세요 (새 노드를 만들지 마세요).`
+      existingNodesBlock = `\n\n## 기존 그래프 노드 (이미 존재하는 노드)\n${existingNodesList}\n\n**중요**: 새로 추출하는 노드가 위 기존 노드와 의미적으로 관련이 있다면, 반드시 엣지(관계)로 연결하세요.\n기존 노드와 동일한 개념이면 같은 label을 사용하세요 (새 노드를 만들지 마세요).`
     }
 
+    // 주제 앵커 블록 (VIS의 핵심: 앵커를 명시적으로 주입)
+    let topicAnchorBlock = ''
+    if (mainTopics.length > 0) {
+      const topicList = mainTopics
+        .map(t => `**${t.label}** (${t.type})`)
+        .join(', ')
+      topicAnchorBlock = `\n\n## 🎯 핵심 주제 앵커 (Topic Anchors) — 가장 중요!
+이 대화의 핵심 주제: ${topicList}
+
+**필수 규칙 (Topic Anchoring Strategy)**:
+1. 위 핵심 주제 노드를 반드시 nodes 배열에 포함하세요.
+2. 대화에서 등장하는 **모든 세부 사물, 장소, 계획, 감정**은 반드시 위 핵심 주제 중 하나와 엣지로 연결되어야 합니다.
+   - 예: 핵심 주제가 "캠핑"이고 "와인"이 언급되면 → "와인" → "캠핑" (관련됨) 엣지 필수
+   - 예: 핵심 주제가 "캠핑"이고 "렌트카"가 언급되면 → "렌트카" → "캠핑" (관련됨) 엣지 필수
+3. 어떤 세부 노드든 핵심 주제와의 연결 없이 단독으로 존재해서는 안 됩니다.
+4. reason 필드에 왜 이 연결이 존재하는지 간단히 설명하세요 (예: "캠핑 갈 때 마실 와인을 사기로 함").`
+    }
+
+    // ---------------------------------------------------------------
+    // [STEP 3] 앵커 기반 그래프 추출 (Anchor-based Graph Extraction)
+    // VIS의 "재귀적 연결" 개념: 세부 사항을 앵커에 강제로 연결
+    // ---------------------------------------------------------------
     const extraction = await chatCompletionJSON<GraphExtraction>([
       {
         role: 'system',
@@ -140,7 +261,8 @@ serve(async (req) => {
 person, topic, event, emotion, habit, value, place, plan
 
 ## 관계 타입 (한국어로 표시)
-원인됨, 관련됨, 유발함, 해결함, 선호함, 회피함, 갈등됨, 지지함, 언급함, 느낌, 계획함, 방문함, 참여함
+원인됨, 관련됨, 유발함, 해결함, 선호함, 회피함, 갈등됨, 지지함, 언급함, 느낌, 계획함, 방문함, 참여함, 부분임
+${topicAnchorBlock}
 
 ## 맥락 연결 규칙 (매우 중요!)
 1. **상위-하위 개념 연결**: 구체적인 개념은 반드시 상위 개념과 연결하세요.
@@ -174,17 +296,68 @@ ${existingNodesBlock}${contextBlock}
 ## 응답 형식 (반드시 JSON)
 {
   "nodes": [{"label": "노드명", "type": "person|topic|event|emotion|habit|value|place|plan"}],
-  "edges": [{"source": "노드명", "source_type": "타입", "target": "노드명", "target_type": "타입", "relation": "관계타입(한국어)"}]
+  "edges": [{"source": "노드명", "source_type": "타입", "target": "노드명", "target_type": "타입", "relation": "관계타입(한국어)", "reason": "이 연결이 존재하는 이유 (짧은 한국어 설명)"}]
 }
 
-노드는 최대 10개, 엣지는 최대 20개. 의미 있는 연결을 충분히 만드세요. 특히 기존 노드와의 연결을 놓치지 마세요.`
+노드는 최대 10개, 엣지는 최대 20개. 의미 있는 연결을 충분히 만드세요. 특히 핵심 주제와의 연결, 기존 노드와의 연결을 놓치지 마세요.`
       },
       { role: 'user', content: text }
     ], { temperature: 0.3 })
 
+    // ---------------------------------------------------------------
+    // [POST-PROCESSING] 앵커 노드 보장 및 고아 노드 연결
+    // 주제 앵커가 추출 결과에 누락된 경우 강제 삽입
+    // ---------------------------------------------------------------
+    const extractedNodes = extraction.nodes || []
+    const extractedEdges = extraction.edges || []
+
+    // 앵커 노드가 추출 결과에 없으면 추가
+    for (const topic of mainTopics) {
+      const exists = extractedNodes.some(
+        n => n.label === topic.label && n.type === topic.type
+      )
+      if (!exists) {
+        extractedNodes.push({ label: topic.label, type: topic.type })
+      }
+    }
+
+    // 고아 노드 검사: 어떤 엣지에도 포함되지 않은 노드를 주제 앵커에 연결
+    if (mainTopics.length > 0) {
+      const connectedLabels = new Set<string>()
+      for (const edge of extractedEdges) {
+        connectedLabels.add(edge.source)
+        connectedLabels.add(edge.target)
+      }
+
+      const primaryAnchor = mainTopics[0]
+      for (const node of extractedNodes) {
+        // 앵커 자신은 건너뜀
+        const isAnchor = mainTopics.some(
+          t => t.label === node.label && t.type === node.type
+        )
+        if (isAnchor) continue
+
+        // person 노드도 건너뜀 (화자 연결은 별도 처리됨)
+        if (node.type === 'person') continue
+
+        if (!connectedLabels.has(node.label)) {
+          extractedEdges.push({
+            source: node.label,
+            source_type: node.type,
+            target: primaryAnchor.label,
+            target_type: primaryAnchor.type,
+            relation: '관련됨',
+            reason: `${node.label}이(가) ${primaryAnchor.label} 맥락에서 언급됨`,
+          })
+        }
+      }
+    }
+
+    // ---------------------------------------------------------------
     // Upsert nodes
+    // ---------------------------------------------------------------
     const nodeIds: Record<string, string> = {}
-    for (const node of (extraction.nodes || [])) {
+    for (const node of extractedNodes) {
       // First check if node exists (exact match)
       const { data: existing } = await admin
         .from('graph_nodes')
@@ -224,7 +397,7 @@ ${existingNodesBlock}${contextBlock}
 
     // Also resolve existing nodes referenced in edges but not in current extraction
     // This allows linking new nodes to existing ones
-    for (const edge of (extraction.edges || [])) {
+    for (const edge of extractedEdges) {
       for (const side of ['source', 'target'] as const) {
         const label = edge[side]
         const type = side === 'source' ? edge.source_type : edge.target_type
@@ -245,10 +418,12 @@ ${existingNodesBlock}${contextBlock}
       }
     }
 
-    // Upsert edges
+    // ---------------------------------------------------------------
+    // Upsert edges (with enhanced evidence from reason field)
+    // ---------------------------------------------------------------
     let edgesCreated = 0
     const edgeFailures: Array<{ edge: GraphExtraction['edges'][number]; reason: string }> = []
-    for (const edge of (extraction.edges || [])) {
+    for (const edge of extractedEdges) {
       const sourceId = nodeIds[`${edge.source}:${edge.source_type}`]
       const targetId = nodeIds[`${edge.target}:${edge.target_type}`]
       if (!sourceId || !targetId) {
@@ -264,9 +439,14 @@ ${existingNodesBlock}${contextBlock}
 
       const relation = normalizeRelation(edge.relation)
 
+      // Build evidence entry with source info and LLM-provided reason
+      const evidenceEntry: Record<string, string> = {}
+      if (source_info) evidenceEntry.source = source_info
+      if (edge.reason) evidenceEntry.reason = edge.reason
+
       const { data: existingEdge } = await admin
         .from('graph_edges')
-        .select('id, weight')
+        .select('id, weight, evidence')
         .eq('couple_id', coupleId)
         .eq('source_node_id', sourceId)
         .eq('target_node_id', targetId)
@@ -274,11 +454,20 @@ ${existingNodesBlock}${contextBlock}
         .maybeSingle()
 
       if (existingEdge) {
+        // Append new evidence to existing array
+        const updatedEvidence = Array.isArray(existingEdge.evidence)
+          ? [...existingEdge.evidence]
+          : []
+        if (Object.keys(evidenceEntry).length > 0) {
+          updatedEvidence.push(evidenceEntry)
+        }
+
         const { error: updateError } = await admin
           .from('graph_edges')
           .update({
             weight: existingEdge.weight + 1,
             last_seen_at: new Date().toISOString(),
+            evidence: updatedEvidence,
           })
           .eq('id', existingEdge.id)
         if (updateError) {
@@ -287,6 +476,10 @@ ${existingNodesBlock}${contextBlock}
           continue
         }
       } else {
+        const initialEvidence = Object.keys(evidenceEntry).length > 0
+          ? [evidenceEntry]
+          : source_info ? [source_info] : []
+
         const { error: insertError } = await admin
           .from('graph_edges')
           .insert({
@@ -296,7 +489,7 @@ ${existingNodesBlock}${contextBlock}
             relation,
             weight: 1,
             last_seen_at: new Date().toISOString(),
-            evidence: source_info ? [source_info] : [],
+            evidence: initialEvidence,
           })
         if (insertError) {
           edgeFailures.push({ edge, reason: insertError.message })
@@ -309,7 +502,8 @@ ${existingNodesBlock}${contextBlock}
     }
 
     return new Response(JSON.stringify({
-      nodes_count: extraction.nodes?.length || 0,
+      topic_anchors: mainTopics.map(t => t.label),
+      nodes_count: extractedNodes.length,
       edges_count: edgesCreated,
       edge_failures_count: edgeFailures.length,
       edge_failures: edgeFailures,
