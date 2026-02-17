@@ -15,6 +15,10 @@ const routes = [
     component: () => import('../views/ChatView.vue')
   },
   {
+    path: '/notes',
+    redirect: '/chat'
+  },
+  {
     path: '/archive',
     name: 'Archive',
     component: () => import('../views/ArchiveView.vue')
