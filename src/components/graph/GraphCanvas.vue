@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as d3 from 'd3'
+import { getEdgeRelationLabel } from '../../lib/graphRelations'
 
 const props = defineProps({
   nodes: { type: Array, default: () => [] },
@@ -78,7 +79,7 @@ function buildGraph() {
     .selectAll('text')
     .data(links)
     .join('text')
-    .text(d => d.relation)
+    .text(d => getEdgeRelationLabel(d, nodeDataMap))
     .attr('font-size', '8px')
     .attr('fill', '#8a7560')
     .attr('text-anchor', 'middle')
