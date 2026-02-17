@@ -25,6 +25,11 @@ interface GraphExtraction {
   }>
 }
 
+interface CouplePerson {
+  label: string
+  type: 'person'
+}
+
 // ---------------------------------------------------------------------------
 // Canonical relation handling
 // ---------------------------------------------------------------------------
@@ -130,6 +135,22 @@ serve(async (req) => {
     if (!membership) throw new Error('커플이 연동되지 않았습니다')
 
     const coupleId = membership.couple_id
+
+    // 커플 기본 인물 노드 고정: 프로필 닉네임을 기반으로 항상 person 노드를 유지
+    const { data: coupleMembers } = await admin
+      .from('couple_members')
+      .select('user_id, profiles:user_id(nickname)')
+      .eq('couple_id', coupleId)
+
+    const corePeople: CouplePerson[] = (coupleMembers || [])
+      .map((member) => ({
+        label: ((member as any).profiles?.nickname || '').trim(),
+        type: 'person' as const,
+      }))
+      .filter((person, index, arr) => (
+        person.label.length > 0
+        && arr.findIndex((p) => p.label === person.label && p.type === person.type) === index
+      ))
 
     // ---------------------------------------------------------------
     // [STEP 1] 주제 앵커링 (Topic Anchoring)
@@ -247,6 +268,19 @@ serve(async (req) => {
 4. reason 필드에 왜 이 연결이 존재하는지 간단히 설명하세요 (예: "캠핑 갈 때 마실 와인을 사기로 함").`
     }
 
+    // 기본 인물 블록: 대화 주제 언급이 없어도 커플 관계를 그래프 중심으로 고정
+    let corePeopleBlock = ''
+    if (corePeople.length > 0) {
+      const peopleList = corePeople.map((p) => `**${p.label}**`).join(', ')
+      corePeopleBlock = `\n\n## 👥 기본 인물 노드 (반드시 유지)
+이 대화의 기본 인물: ${peopleList}
+
+**필수 규칙**:
+1. 위 인물들은 이번 추출 결과의 nodes 배열에 반드시 person 타입으로 포함하세요.
+2. 위 인물들 사이의 기본 관계를 표현하는 엣지를 최소 1개 포함하세요 (예: 관련됨/지지함).
+3. 대화에 특정 인물 언급이 적어도, 커플의 기본 관계 중심 구조는 유지해야 합니다.`
+    }
+
     // ---------------------------------------------------------------
     // [STEP 3] 앵커 기반 그래프 추출 (Anchor-based Graph Extraction)
     // VIS의 "재귀적 연결" 개념: 세부 사항을 앵커에 강제로 연결
@@ -263,6 +297,7 @@ person, topic, event, emotion, habit, value, place, plan
 ## 관계 타입 (한국어로 표시)
 원인됨, 관련됨, 유발함, 해결함, 선호함, 회피함, 갈등됨, 지지함, 언급함, 느낌, 계획함, 방문함, 참여함, 부분임
 ${topicAnchorBlock}
+${corePeopleBlock}
 
 ## 맥락 연결 규칙 (매우 중요!)
 1. **상위-하위 개념 연결**: 구체적인 개념은 반드시 상위 개념과 연결하세요.
@@ -318,6 +353,45 @@ ${existingNodesBlock}${contextBlock}
       )
       if (!exists) {
         extractedNodes.push({ label: topic.label, type: topic.type })
+      }
+    }
+
+    // 커플 기본 인물 노드가 추출 결과에 없으면 추가
+    for (const person of corePeople) {
+      const exists = extractedNodes.some(
+        n => n.label === person.label && n.type === person.type
+      )
+      if (!exists) {
+        extractedNodes.push(person)
+      }
+    }
+
+    // 커플 기본 관계 엣지 보장 (양방향 중 한 방향이라도 있으면 유지)
+    if (corePeople.length >= 2) {
+      const [personA, personB] = corePeople
+      const hasBaseEdge = extractedEdges.some((edge) => (
+        (
+          edge.source === personA.label
+          && edge.source_type === 'person'
+          && edge.target === personB.label
+          && edge.target_type === 'person'
+        ) || (
+          edge.source === personB.label
+          && edge.source_type === 'person'
+          && edge.target === personA.label
+          && edge.target_type === 'person'
+        )
+      ))
+
+      if (!hasBaseEdge) {
+        extractedEdges.push({
+          source: personA.label,
+          source_type: 'person',
+          target: personB.label,
+          target_type: 'person',
+          relation: '관련됨',
+          reason: '커플 프로필 기반 기본 관계 노드 고정',
+        })
       }
     }
 
