@@ -87,3 +87,4 @@ export function getEdgeRelationLabel(edge, nodeDataMap = new Map()) {
 
   return getRelationByCanonical(normalized, source, target) || edge?.relation || '이어짐'
 }
+}
