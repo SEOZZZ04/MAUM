@@ -102,9 +102,37 @@ export const useGraphStore = defineStore('graph', () => {
     )
   }
 
+  async function resetGraph() {
+    const couple = useCoupleStore()
+    if (!couple.coupleId) return
+
+    loading.value = true
+    const [{ error: edgesError }, { error: nodesError }] = await Promise.all([
+      supabase
+        .from('graph_edges')
+        .delete()
+        .eq('couple_id', couple.coupleId),
+      supabase
+        .from('graph_nodes')
+        .delete()
+        .eq('couple_id', couple.coupleId)
+    ])
+
+    if (edgesError || nodesError) {
+      loading.value = false
+      throw edgesError || nodesError
+    }
+
+    nodes.value = []
+    edges.value = []
+    searchQuery.value = ''
+    loading.value = false
+  }
+
   return {
     nodes, edges, loading, searchQuery,
     fetchGraph, searchNodes, getRelatedEdges,
-    subscribeToGraphChanges, unsubscribeFromGraphChanges
+    subscribeToGraphChanges, unsubscribeFromGraphChanges,
+    resetGraph
   }
 })

@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useGraphStore } from '../stores/graph'
 import { useCoupleStore } from '../stores/couple'
 import { api } from '../lib/api'
@@ -17,6 +17,26 @@ const analysisResult = ref(null)
 const analysisLoading = ref(false)
 const graphCanvasRef = ref(null)
 const searchResultCount = ref(0)
+
+const resetLoading = ref(false)
+
+async function resetKnowledgeGraph() {
+  const confirmed = window.confirm('지식 그래프를 초기화할까요? 이 작업은 되돌릴 수 없어요.')
+  if (!confirmed) return
+
+  resetLoading.value = true
+  try {
+    await graph.resetGraph()
+    selectedNode.value = null
+    searchInput.value = ''
+    searchResultCount.value = 0
+  } catch (e) {
+    window.alert(`그래프 초기화에 실패했어요: ${e.message}`)
+  } finally {
+    resetLoading.value = false
+  }
+}
+
 
 onMounted(async () => {
   if (couple.isConnected) {
@@ -95,6 +115,12 @@ const nodeTypeLabels = {
             {{ searchResultCount }}개 발견
           </span>
         </div>
+        <button
+          @click="resetKnowledgeGraph"
+          :disabled="resetLoading || graph.loading"
+          class="text-xs bg-[#f8d9d9] text-[#b85c5c] px-3 py-2 rounded-xl hover:bg-[#f3c3c3] transition-colors font-medium border border-[#efb4b4] disabled:opacity-50 disabled:cursor-not-allowed">
+          {{ resetLoading ? '초기화 중...' : '그래프 초기화' }}
+        </button>
         <button @click="showAnalysis = !showAnalysis"
           class="text-xs bg-[#c9b8d9]/15 text-[#8a6fa0] px-3 py-2 rounded-xl hover:bg-[#c9b8d9]/25 transition-colors font-medium border border-[#c9b8d9]/30">
           분석
